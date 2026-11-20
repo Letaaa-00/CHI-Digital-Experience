@@ -2,7 +2,7 @@
 (function () {
   const ICONS = window.CHI_ICONS;
   const { CATS, CAT, PILLARS, DAYS, TYPES, PROGRAMS, FLOORS, ROOM, EVENTS, EVENT, PRESENTERS, ROLES, TOPICS, INFO } = window.CHI;
-  const FX = window.FX;
+  const FX = window.FX, Creative = window.Creative;
 
   const app = document.getElementById('app');
   const $ = (s, el = document) => el.querySelector(s);
@@ -13,10 +13,10 @@
   const KEY = 'chi27-proto-v1';
   const blank = () => ({ mode: null, user: null, schedule: [], checks: {} });
   let S = (() => { try { return Object.assign(blank(), JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { return blank(); } })();
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* private mode — keep in memory */ } };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; /* private mode or storage full — keep in memory */ } };
 
   const newSetup = () => ({ step: 0, name: '', email: '', role: null, mix: [1 / 3, 1 / 3, 1 / 3], topics: [] });
-  const UI = { evDay: 0, evCat: null, evType: null, dashDay: 0, setup: newSetup() };
+  const UI = { evDay: 0, evCat: null, evType: null, dashDay: 0, flipped: false, setup: newSetup() };
 
   /* ---------- small pieces ---------- */
   const G = {
@@ -26,6 +26,7 @@
     check: '<svg class="g g-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6"/></svg>',
     close: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
     pin: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.800 12 21 12 21z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9.500" r="2.200" fill="currentColor"/></svg>',
+    edit: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19.500 8.500l-4-4L4 16v4zM13 7l4 4" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
     lock: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" fill="currentColor"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   };
 
@@ -62,7 +63,7 @@
   }
   const wide = window.matchMedia('(min-width: 760px)');
   const split = window.matchMedia('(min-width: 900px)');
-  const secHead = (n, title, extra) => `<div class="sec-h"><span class="mono">${n}</span><h2>${title}</h2>${extra || ''}</div>`;
+  const secHead = (n, title, extra) => `<div class="sec-h"><span class="lbl">${n}</span><h2>${title}</h2>${extra || ''}</div>`;
 
   /* ---------- schedule ---------- */
   const myPresentations = () => (S.user && S.user.presenter && PRESENTERS[S.user.email] ? PRESENTERS[S.user.email].presentations : []);
@@ -76,6 +77,7 @@
     return `<button class="add ${on ? 'is-on' : ''}" data-act="toggle" data-id="${id}" aria-pressed="${on}" aria-label="${on ? 'Remove from' : 'Add to'} my schedule">${G.plus}${G.check}</button>`;
   }
   function toggleSched(id) {
+    const had = S.user ? interestsOf(S.user).map(x => x.id) : [];
     const on = !inSched(id);
     S.schedule = on ? S.schedule.concat(id) : S.schedule.filter(x => x !== id);
     save();
@@ -86,12 +88,18 @@
       if (on) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
     });
     const e = EVENT[id];
+    const has = S.user ? interestsOf(S.user).map(x => x.id) : [];
+    const gained = has.find(x => !had.includes(x));
+    const link = current() === 'dashboard' ? null : { label: 'View', go: 'dashboard' };
     if (on) {
       const clash = S.schedule.map(x => EVENT[x]).find(o => o.id !== id && o.day === e.day && mins(o.start) < mins(e.end) && mins(e.start) < mins(o.end));
-      toast(clash ? `Added — overlaps with “${clash.title}”` : `Added to ${dayLabel(e.day)}`, current() === 'dashboard' ? null : { label: 'View', go: 'dashboard' });
+      toast(gained ? `${CAT[gained].name} joins your badge — ${ALSO_EVENTS} events saved` : clash ? `Added — overlaps with “${clash.title}”` : `Added to ${dayLabel(e.day)}`, link);
       UI.dashDay = e.day;
     } else toast('Removed from your schedule');
-    if (current() === 'dashboard') Dashboard.paintSchedule();
+    if (current() === 'dashboard') {
+      Dashboard.paintSchedule();
+      if (has.join() !== had.join()) Dashboard.paintProfile();
+    }
     updateBurger();
   }
 
@@ -102,7 +110,7 @@
     return `<article class="ev" style="--c:${c.color}" data-act="event" data-id="${e.id}" tabindex="0" role="button" aria-label="${esc(e.title)}">
       <div class="ev__ico">${icon(e.cat)}</div>
       <div class="ev__body">
-        <p class="mono ev__meta"><span>${opts.day ? DAYS[e.day].dow + ' ' : ''}${e.start}–${e.end}</span><span>${TYPES[e.type]}</span></p>
+        <p class="lbl ev__meta"><span>${opts.day ? DAYS[e.day].dow + ' ' : ''}${e.start}–${e.end}</span><span>${TYPES[e.type]}</span></p>
         <h3>${esc(e.title)}</h3>
         <p class="ev__where">${ROOM[e.room].name}</p>
         ${mine ? `<span class="tag tag--solid">You’re presenting</span>` : ''}${e.open && S.mode === 'visitor' ? `<span class="tag">Open to visitors</span>` : ''}
@@ -141,7 +149,7 @@
   function eventSheet(id) {
     const e = EVENT[id], c = CAT[e.cat], mine = presentingAt(id);
     openSheet(`<div class="evd" style="--c:${c.color}">
-      <div class="evd__top"><div class="evd__ico">${icon(e.cat)}</div><p class="mono">${TYPES[e.type]}<br><span>${c.name}</span></p></div>
+      <div class="evd__top"><div class="evd__ico">${icon(e.cat)}</div><p class="lbl">${TYPES[e.type]}<br><span>${c.name}</span></p></div>
       <h2>${esc(e.title)}</h2>
       ${mine ? `<p class="tag tag--solid">You’re presenting · ${mine.slot}</p>` : ''}
       <p class="evd__blurb">${esc(e.blurb)}</p>
@@ -164,12 +172,12 @@
     const cur = current();
     const who = S.user ? `Signed in as <b>${esc(S.user.name)}</b>` : 'Browsing in <b>guest mode</b>';
     menuEl.innerHTML = `<div class="menu__top">${logo('#/home')}<button class="burger is-open" data-act="close-menu" aria-label="Close menu"><i></i><i></i></button></div>
-      <nav class="menu__nav">${NAV.map(([r, n], i) => `<a href="#/${r}" class="${cur === r ? 'is-cur' : ''}" style="--i:${i}"><span class="mono">0${i + 1}</span><b>${n}</b>${r === 'dashboard' && S.schedule.length ? `<em>${S.schedule.length}</em>` : ''}</a>`).join('')}</nav>
+      <nav class="menu__nav">${NAV.map(([r, n], i) => `<a href="#/${r}" class="${cur === r ? 'is-cur' : ''}" style="--i:${i}"><span class="lbl">0${i + 1}</span><b>${n}</b>${r === 'dashboard' && S.schedule.length ? `<em>${S.schedule.length}</em>` : ''}</a>`).join('')}</nav>
       <div class="menu__foot" style="--i:6">
         <p>${who}</p>
         <div>${S.user ? `<button class="btn btn--ghost btn--sm" data-act="logout">Log out</button>` : `<button class="btn btn--primary btn--sm" data-go="join">Join Conference</button>`}
         <button class="btn btn--text btn--sm" data-act="reset">Reset prototype</button></div>
-        <p class="mono dim">${INFO.dates} · ${INFO.city}</p>
+        <p class="lbl dim">${INFO.dates} · ${INFO.city}</p>
       </div>`;
     menuEl.hidden = false;
     requestAnimationFrame(() => menuEl.classList.add('is-on'));
@@ -185,6 +193,8 @@
   }
 
   /* ---------- interest scoring ---------- */
+  // a domain's score = how close its mix sits to the person's mix + points from the topics they picked;
+  // the two highest are the person's primary and secondary interest
   function rank(mix, topics) {
     const sc = {};
     CATS.forEach(c => {
@@ -193,6 +203,58 @@
     });
     topics.forEach(n => { const t = TOPICS.find(x => x.name === n); if (t) { sc[t.a] += 6; sc[t.b] += 3; } });
     return CATS.map(c => c.id).sort((a, b) => sc[b] - sc[a]);
+  }
+  // Everyone starts with those two. A further domain joins the badge once the person has saved
+  // ALSO_EVENTS events from it to their schedule (ALSO_MAX further domains at most).
+  const ALSO_EVENTS = 3, ALSO_MAX = 2;
+  function interestsOf(u) {
+    const n = {};
+    S.schedule.forEach(id => { const e = EVENT[id]; if (e) n[e.cat] = (n[e.cat] || 0) + 1; });
+    const also = CATS.map(c => c.id).filter(id => id !== u.primary && id !== u.secondary && n[id] >= ALSO_EVENTS)
+      .sort((a, b) => n[b] - n[a]).slice(0, ALSO_MAX);
+    return [{ id: u.primary, kind: 'Primary' }, { id: u.secondary, kind: 'Secondary' }].concat(also.map(id => ({ id, kind: 'Also' })));
+  }
+  // creative-badge settings, always in a known shape. bio is the person's own sentence; '' means "use the suggested one".
+  function creativeOf(u) {
+    const c = u.creative || {};
+    let h = 0; for (const ch of u.name || '') h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    u.creative = {
+      v: 2, bio: c.v === 2 && typeof c.bio === 'string' ? c.bio : '', seed: c.seed || 1 + (h % 900),
+      images: (Array.isArray(c.images) ? c.images : []).filter(Creative.okImage).slice(0, Creative.MAX_IMAGES),
+    };
+    return u.creative;
+  }
+  // uploaded images are shrunk and kept in this browser only
+  function shrink(file) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 640 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+        const x = c.getContext('2d');
+        x.fillStyle = '#1e1e1e'; x.fillRect(0, 0, c.width, c.height);
+        x.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        res(c.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('unreadable')); };
+      img.src = url;
+    });
+  }
+  async function addImages(files) {
+    const cr = creativeOf(S.user);
+    let bad = 0;
+    for (const f of Array.from(files)) {
+      if (cr.images.length >= Creative.MAX_IMAGES) break;
+      if (!/^image\//.test(f.type)) { bad++; continue; }
+      try {
+        cr.images.push(await shrink(f));
+        if (!save()) { cr.images.pop(); toast('No room left on this device for that image'); break; }
+      } catch (e) { bad++; }
+    }
+    if (bad) toast(bad === 1 ? 'One file wasn’t an image we could read' : `${bad} files weren’t images we could read`);
+    Dashboard.paintEditor();
   }
   function recommend(limit) {
     const u = S.user;
@@ -211,19 +273,19 @@
     html() {
       const u = S.user;
       return `<section class="landing">
-        ${bar({ onboarding: true, right: '<span class="mono dim">ACM SIGCHI</span>', cls: 'bar--clear' })}
+        ${bar({ onboarding: true, right: '<span class="lbl dim">ACM SIGCHI</span>', cls: 'bar--clear' })}
         <div class="landing__title">
-          <p class="mono">Conference on Human Factors<br>in Computing Systems</p>
+          <p class="lbl">Conference on Human Factors<br>in Computing Systems</p>
           <h1>CHI<br>2027</h1>
         </div>
         <div class="landing__stage">
           <canvas class="pix" id="pix" aria-hidden="true"></canvas>
-          <p class="mono landing__now"><i id="pixdot"></i><span id="pixname">&nbsp;</span></p>
+          <p class="lbl landing__now"><i id="pixdot"></i><span id="pixname">&nbsp;</span></p>
         </div>
         <div class="landing__foot">
           <dl class="facts">
-            <div><dt class="mono">When</dt><dd>${INFO.dates}</dd></div>
-            <div><dt class="mono">Where</dt><dd>${INFO.city}<small>${INFO.venue}</small></dd></div>
+            <div><dt class="lbl">When</dt><dd>${INFO.dates}</dd></div>
+            <div><dt class="lbl">Where</dt><dd>${INFO.city}<small>${INFO.venue}</small></dd></div>
           </dl>
           ${u ? `<button class="btn btn--primary" data-go="dashboard">Continue as ${esc(u.name.split(' ')[0])} ${G.arrow}</button>
                  <button class="btn btn--text" data-go="home">Go to the conference home</button>`
@@ -251,24 +313,24 @@
   const Join = {
     html() {
       return `<section class="join stagger">
-        ${bar({ back: '', right: '<span class="mono dim">Join</span>', cls: 'bar--clear' })}
+        ${bar({ back: '', right: '<span class="lbl dim">Join</span>', cls: 'bar--clear' })}
         <h1 class="display">How are you<br>joining us?</h1>
         <button class="role" data-act="mode" data-mode="attendee" style="--c:var(--g)">
-          <span class="mono">Attendee</span>
+          <span class="lbl">Attendee</span>
           <span class="role__glyph"><i class="sq"></i><i class="ci"></i></span>
           <b>I’m attending CHI.</b>
           <span class="role__line">Plan around sessions and meet people with shared interests.</span>
           <span class="role__go">${G.arrow}</span>
         </button>
         <button class="role" data-act="mode" data-mode="visitor" style="--c:var(--r)">
-          <span class="mono">Visitor</span>
+          <span class="lbl">Visitor</span>
           <span class="role__glyph"><i class="ci"></i><i class="ci ci--o"></i></span>
           <b>I’m a visitor.</b>
           <span class="role__line">Browse community activities that are open to visitors.</span>
           <span class="role__go">${G.arrow}</span>
         </button>
-        <button class="role role--slim" data-act="mode" data-mode="guest" style="--c:var(--b-lit)">
-          <span class="mono">Guest mode</span>
+        <button class="role role--slim" data-act="mode" data-mode="guest" style="--c:var(--b);--on:#fff">
+          <span class="lbl">Guest mode</span>
           <b>Just looking around.</b>
           <span class="role__line">No account. Go straight to the conference home.</span>
           <span class="role__go">${G.arrow}</span>
@@ -284,7 +346,7 @@
     html() {
       if (!S.mode || S.mode === 'guest') S.mode = 'attendee';
       return `<section class="setup">
-        ${bar({ back: '@setup', right: `<span class="mono dim" id="stepno"></span>`, cls: 'bar--clear' })}
+        ${bar({ back: '@setup', right: `<span class="lbl dim" id="stepno"></span>`, cls: 'bar--clear' })}
         <div class="prog" id="prog">${STEPS.map(() => '<i></i>').join('')}</div>
         <div class="setup__body" id="step"></div>
         <div class="setup__foot">
@@ -297,26 +359,26 @@
       const su = UI.setup, visitor = S.mode === 'visitor';
       if (step === 'you') return `
         <h1 class="display">First,<br>your badge.</h1>
-        <label class="field"><span class="mono">Name</span><input id="f-name" data-in="name" autocomplete="name" autocapitalize="words" placeholder="What should we call you?" value="${esc(su.name)}"></label>
-        <label class="field"><span class="mono">Email${visitor ? ' — optional' : ''}</span><input id="f-email" data-in="email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="${visitor ? 'you@example.org' : 'The email you registered with'}" value="${esc(su.email)}"></label>
+        <label class="field"><span class="lbl">Name</span><input id="f-name" data-in="name" autocomplete="name" autocapitalize="words" placeholder="What should we call you?" value="${esc(su.name)}"></label>
+        <label class="field"><span class="lbl">Email${visitor ? ' — optional' : ''}</span><input id="f-email" data-in="email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="${visitor ? 'you@example.org' : 'The email you registered with'}" value="${esc(su.email)}"></label>
         <div id="match"></div>
         ${visitor ? '' : `<p class="hint">Presenting a paper, poster or demo? Use your registration email and your slots are added for you. <button class="link" data-act="demo-email">Try a sample presenter</button></p>`}`;
       if (step === 'role') return `
         <h1 class="display">What brings<br>you to CHI?</h1>
-        <div class="opts" role="radiogroup">${ROLES.map((r, i) => `<button class="opt ${su.role === r.id ? 'is-on' : ''}" role="radio" aria-checked="${su.role === r.id}" data-act="role" data-id="${r.id}" style="--i:${i}"><i></i><b>${r.name}</b><span class="mono">${r.tag}</span></button>`).join('')}</div>`;
+        <div class="opts" role="radiogroup">${ROLES.map((r, i) => `<button class="opt ${su.role === r.id ? 'is-on' : ''}" role="radio" aria-checked="${su.role === r.id}" data-act="role" data-id="${r.id}" style="--i:${i}"><i></i><b>${r.name}</b><span class="lbl">${r.tag}</span></button>`).join('')}</div>`;
       if (step === 'mix') return `
         <h1 class="display">Mix your CHI.</h1>
         <p class="lede">Drag the dot toward what you’re most curious about.</p>
         <div class="tri" id="tri">
           <div class="tri__fill"></div>
           <div class="tri__grain"></div>
-          ${PILLARS.map((p, i) => `<button class="tri__v tri__v--${p.id}" data-act="tri-snap" data-k="${i}"><b>${p.name}</b><span class="mono" id="tri-p${i}"></span></button>`).join('')}
+          ${PILLARS.map((p, i) => `<button class="tri__v tri__v--${p.id}" data-act="tri-snap" data-k="${i}"><b>${p.name}</b><span class="lbl" id="tri-p${i}"></span></button>`).join('')}
           <div class="tri__puck" id="puck" role="slider" tabindex="0" aria-label="Interest mix"></div>
         </div>
         <div id="trimix"></div>`;
       return `
         <h1 class="display">What makes you<br>stop scrolling?</h1>
-        <p class="lede">Pick up to five. <span class="mono" id="topicn"></span></p>
+        <p class="lede">Pick up to five. <span class="lbl" id="topicn"></span></p>
         <div class="chips">${TOPICS.map((t, i) => `<button class="chip ${su.topics.includes(t.name) ? 'is-on' : ''}" data-act="topic" data-name="${esc(t.name)}" aria-pressed="${su.topics.includes(t.name)}" style="--i:${i}">${t.name}</button>`).join('')}</div>`;
     },
     paint(dir) {
@@ -398,7 +460,8 @@
       const ranked = rank(su.mix, su.topics);
       const email = su.email.trim().toLowerCase();
       const pres = S.mode === 'attendee' && PRESENTERS[email];
-      S.user = { name: su.name.trim(), email, role: su.role, primary: ranked[0], secondary: ranked[1], mix: su.mix, topics: su.topics, presenter: !!pres };
+      const prev = S.user;
+      S.user = { name: su.name.trim(), email, role: su.role, primary: ranked[0], secondary: ranked[1], mix: su.mix, topics: su.topics, presenter: !!pres, creative: prev ? prev.creative : undefined };
       if (pres) pres.presentations.forEach(p => { if (!inSched(p.event)) S.schedule.push(p.event); });
       save();
       UI.setup = newSetup();
@@ -413,19 +476,19 @@
       if (!u) return `<section class="reveal"><p class="lede">No badge yet.</p><button class="btn btn--primary" data-go="join">Join Conference</button></section>`;
       const p = CAT[u.primary], s = CAT[u.secondary];
       return `<section class="reveal" id="reveal" style="--c:${p.color};--c2:${s.color}">
-        ${bar({ onboarding: true, right: '<span class="mono dim">Your icon</span>', cls: 'bar--clear' })}
-        <p class="mono reveal__kicker" id="rvk">Reading your answers…</p>
+        ${bar({ onboarding: true, right: '<span class="lbl dim">Your icon</span>', cls: 'bar--clear' })}
+        <p class="lbl reveal__kicker" id="rvk">Reading your answers…</p>
         <button class="reveal__stage" data-act="replay" aria-label="Replay the reveal">
           <canvas id="rv" aria-hidden="true"></canvas>
           <span class="reveal__svg">${icon(u.primary)}</span>
         </button>
         <div class="reveal__main">
-          <p class="mono">Primary interest</p>
+          <p class="lbl">Primary interest</p>
           <h1>${p.name}</h1>
         </div>
         <div class="reveal__second">
           <span class="reveal__ico2">${icon(u.secondary)}</span>
-          <div><p class="mono">With a streak of</p><h2>${s.name}</h2></div>
+          <div><p class="lbl">With a streak of</p><h2>${s.name}</h2></div>
         </div>
         <div class="reveal__mix">${mixBar(u.mix, true)}</div>
         <div class="reveal__foot">
@@ -457,11 +520,11 @@
   const Login = {
     html() {
       return `<section class="login stagger">
-        ${bar({ back: '', right: '<span class="mono dim">Log in</span>', cls: 'bar--clear' })}
+        ${bar({ back: '', right: '<span class="lbl dim">Log in</span>', cls: 'bar--clear' })}
         <h1 class="display">Welcome<br>back.</h1>
         <form id="loginform" novalidate>
-          <label class="field"><span class="mono">Email</span><input id="l-email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="you@example.org"></label>
-          <label class="field"><span class="mono">Password</span><input id="l-pass" type="password" autocomplete="current-password" placeholder="••••••••"></label>
+          <label class="field"><span class="lbl">Email</span><input id="l-email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="you@example.org"></label>
+          <label class="field"><span class="lbl">Password</span><input id="l-pass" type="password" autocomplete="current-password" placeholder="••••••••"></label>
           <p class="err" id="l-err" role="alert"></p>
           <p class="hint">Prototype: any password works. <button type="button" class="link" data-act="demo-login">Use a sample presenter account</button></p>
           <div class="login__foot">
@@ -501,8 +564,8 @@
       return `${bar()}<section class="dash">
         <div class="dash__side">
         ${secHead('01', 'Profile')}
-        ${u ? Dashboard.badge() : `<div class="guestcard">
-            <p class="mono">Guest mode</p>
+        ${u ? `<div id="dash-profile">${Dashboard.badge()}</div>` : `<div class="guestcard">
+            <p class="lbl">Guest mode</p>
             <h3>You’re browsing without a badge.</h3>
             <p>Create one to get your icon, matched events and — if you’re presenting — your slots.</p>
             <button class="btn btn--primary" data-go="join">Join Conference ${G.arrow}</button>
@@ -515,25 +578,102 @@
         ${secHead(u && S.mode !== 'visitor' ? '04' : '03', 'Events that might interest you')}
         <div id="dash-recs">${Dashboard.recsHTML()}</div>
         </div>
-        <p class="dash__end mono dim">${INFO.dates} · ${INFO.venue}</p>
+        <p class="dash__end lbl dim">${INFO.dates} · ${INFO.venue}</p>
       </section>`;
     },
-    mount() { Dashboard.paintSchedule(); },
+    mount() {
+      Dashboard.paintSchedule();
+      Dashboard.mountProfile();
+      return () => Dashboard.unmountProfile && Dashboard.unmountProfile();
+    },
+    // the simple badge (front) and the creative badge (back); a click flips it
     badge() {
-      const u = S.user, p = CAT[u.primary], s = CAT[u.secondary];
+      const u = S.user, ints = interestsOf(u);
+      creativeOf(u);
       const role = (ROLES.find(r => r.id === u.role) || {}).tag || 'Attendee';
-      return `<div class="badge" style="--c:${p.color};--on:${onColor(p.color)};--c2:${s.color}">
-        <div class="badge__row mono"><span>CHI 2027 · ${S.mode === 'visitor' ? 'Visitor' : u.presenter ? 'Presenter' : 'Attendee'}</span><span>May 10–14</span></div>
-        <div class="badge__icon">${icon(u.primary)}</div>
-        <h3>${esc(u.name)}</h3>
-        <p class="badge__sub">${role}${u.email ? ' · ' + esc(u.email) : ''}</p>
-        <div class="badge__ints">
-          <span class="int int--1">${icon(u.primary)}<span><small class="mono">Primary</small>${p.name}</span></span>
-          <span class="int int--2">${icon(u.secondary)}<span><small class="mono">Secondary</small>${s.name}</span></span>
+      const kind = S.mode === 'visitor' ? 'Visitor' : u.presenter ? 'Presenter' : 'Attendee';
+      const flipped = !!UI.flipped;
+      return `<div class="badge ${flipped ? 'is-flipped' : ''}" id="badge" tabindex="0" role="button" aria-pressed="${flipped}" aria-label="Your badge. Activate to flip between the simple side and the creative side.">
+        <div class="badge__inner">
+          <div class="badge__face badge__front"${flipped ? ' inert' : ''}>
+            <div class="badge__row lbl"><span>CHI 2027</span><span>${kind}</span><span>May 10–14</span></div>
+            <div class="badge__icons">${ints.map(x => `<span class="badge__ico" style="--c:${CAT[x.id].color}" title="${CAT[x.id].name}">${icon(x.id)}</span>`).join('')}</div>
+            <h3>${esc(u.name)}</h3>
+            <p class="badge__sub">${role}${u.email ? ' · ' + esc(u.email) : ''}</p>
+          </div>
+          <div class="badge__face badge__back"${flipped ? '' : ' inert'}>
+            <div class="cb" id="cb" role="img" aria-label="${esc(Creative.bioText(u, ints))}"></div>
+            <button class="badge__edit" data-act="cb-edit" aria-label="Edit creative badge">${G.edit}</button>
+          </div>
         </div>
       </div>
       <div class="dash__mix">${mixBar(u.mix, true)}</div>
       <div class="dash__actions"><button class="btn btn--ghost btn--sm" data-act="retake">Retake interests</button><button class="btn btn--ghost btn--sm" data-go="icon">Show my icon</button><button class="btn btn--text btn--sm" data-act="logout">Log out</button></div>`;
+    },
+    // the editor for the creative side, shown in the sheet with a small live preview
+    editorHTML() {
+      const u = S.user, cr = creativeOf(u), ints = interestsOf(u);
+      const suggested = Creative.defaultBio(u, ints), text = cr.bio || suggested;
+      const n = Creative.bioWords(text).length, full = cr.images.length >= Creative.MAX_IMAGES;
+      return `<div class="cbe">
+        <h2>Creative badge</h2>
+        <div class="cbe__preview"><div class="cb" id="cb-prev"></div></div>
+        <label class="cbe__field"><span class="lbl">Bio <em id="cb-count" class="${n >= Creative.BIO_WORDS ? 'is-full' : ''}">${n} / ${Creative.BIO_WORDS} words</em></span>
+          <textarea id="cb-bio" rows="3" maxlength="180" autocomplete="off" spellcheck="false" placeholder="${esc(suggested)}">${esc(text)}</textarea></label>
+        <button class="link cbe__reset" data-act="cb-reset"${cr.bio ? '' : ' hidden'}>Use the suggested sentence</button>
+        <div class="cbe__field"><span class="lbl">Images <em>${cr.images.length} / ${Creative.MAX_IMAGES} · kept on this device</em></span>
+          <div class="cbe__imgs">${cr.images.map((src, i) => `<span class="cbe__thumb" style="background-image:url(${src})"><button data-act="cb-rm" data-i="${i}" aria-label="Remove image ${i + 1}">${G.close}</button></span>`).join('')}
+            ${full ? '' : `<button class="cbe__add" data-act="cb-add" aria-label="Add images">${G.plus}</button><input type="file" id="cb-file" accept="image/*" multiple hidden>`}</div></div>
+        <div class="cbe__row"><button class="btn btn--ghost" data-act="cb-shuffle">Shuffle</button><button class="btn btn--primary" data-act="close-sheet">Done</button></div>
+      </div>`;
+    },
+    openEditor() {
+      if (!S.user) return;
+      Dashboard.flip(true);
+      openSheet(Dashboard.editorHTML());
+      Dashboard.drawCreative();
+    },
+    paintEditor() {
+      const el = $('.cbe');
+      if (el) el.outerHTML = Dashboard.editorHTML();
+      Dashboard.drawCreative();
+    },
+    paintProfile() {
+      const el = $('#dash-profile'); if (!el || !S.user) return;
+      el.innerHTML = Dashboard.badge();
+      Dashboard.mountProfile();
+    },
+    // draws the collage on the badge and, when the editor is open, in its preview
+    drawCreative() {
+      if (!S.user) return;
+      const ints = interestsOf(S.user);
+      ['#cb', '#cb-prev'].forEach(sel => { const el = $(sel); if (el) Creative.render(el, S.user, ints); });
+    },
+    mountProfile() {
+      if (Dashboard.unmountProfile) Dashboard.unmountProfile();
+      Dashboard.unmountProfile = null;
+      const b = $('#badge');
+      if (!b) return;
+      Dashboard.drawCreative();
+      Creative.ready.then(Dashboard.drawCreative);
+      let raf = 0;
+      const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(Dashboard.drawCreative); });
+      ro.observe(b);
+      b.addEventListener('click', e => { if (!e.target.closest('.badge__edit')) Dashboard.flip(); });
+      b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === b) { e.preventDefault(); Dashboard.flip(); } });
+      // one small nod on first sight, to show the badge has another side
+      if (!UI.peeked && !UI.flipped && !FX.reduced) { UI.peeked = true; b.classList.add('peek'); setTimeout(() => b.classList.remove('peek'), 2300); }
+      Dashboard.unmountProfile = () => { ro.disconnect(); cancelAnimationFrame(raf); };
+    },
+    flip(to) {
+      const b = $('#badge'); if (!b) return;
+      UI.flipped = to == null ? !UI.flipped : !!to;
+      b.classList.remove('peek');
+      b.classList.toggle('is-flipped', UI.flipped);
+      b.setAttribute('aria-pressed', UI.flipped);
+      const front = $('.badge__front', b), back = $('.badge__back', b);
+      if (front) front.inert = UI.flipped;
+      if (back) back.inert = !UI.flipped;
     },
     presHTML() {
       const list = myPresentations();
@@ -547,7 +687,7 @@
         const e = EVENT[p.event], c = CAT[e.cat];
         const done = p.needs.filter((_, i) => S.checks[p.id + ':' + i]).length;
         return `<article class="pres" style="--c:${c.color};--on:${onColor(c.color)}">
-          <header><span class="tag tag--c">${p.kind}</span><span class="mono">${dayLabel(e.day)}</span></header>
+          <header><span class="tag tag--c">${p.kind}</span><span class="lbl">${dayLabel(e.day)}</span></header>
           <h3>${esc(p.title)}</h3>
           <dl class="kv">
             <div><dt>Time</dt><dd>${p.slot.split(' · ')[0]}</dd></div>
@@ -555,7 +695,7 @@
             <div class="kv__wide"><dt>${p.kind === 'Paper' ? 'Session' : 'Part of'}</dt><dd>${esc(e.title)} · ${e.start}–${e.end}</dd></div>
           </dl>
           <details ${done < p.needs.length ? 'open' : ''}>
-            <summary><span>What you need to do</span><span class="mono" data-count="${p.id}">${done}/${p.needs.length}</span></summary>
+            <summary><span>What you need to do</span><span class="lbl" data-count="${p.id}">${done}/${p.needs.length}</span></summary>
             <ul class="checks">${p.needs.map((n, i) => `<li><label><input type="checkbox" data-check="${p.id}:${i}" ${S.checks[p.id + ':' + i] ? 'checked' : ''}><i>${G.check}</i><span>${esc(n)}</span></label></li>`).join('')}</ul>
           </details>
           <button class="btn btn--ghost btn--sm" data-go="map/room/${e.room}">${G.pin} Find the room</button>
@@ -571,31 +711,31 @@
         // tablet and desktop: the whole week side by side
         el.innerHTML = `<div class="week">${DAYS.map((d, i) => {
           const list = items.filter(e => e.day === i);
-          return `<div class="week__col"><div class="week__h"><span class="mono">${d.dow}</span><b>${d.d}</b>${list.length ? `<i>${list.length}</i>` : ''}</div>${list.length ? list.map(e => {
+          return `<div class="week__col"><div class="week__h"><span class="lbl">${d.dow}</span><b>${d.d}</b>${list.length ? `<i>${list.length}</i>` : ''}</div>${list.length ? list.map(e => {
             const mine = presentingAt(e.id);
             const clash = list.find(o => o !== e && mins(o.start) < mins(e.end) && mins(e.start) < mins(o.end));
             return `<div class="wk ${mine ? 'is-mine' : ''}" style="--c:${CAT[e.cat].color}" data-act="event" data-id="${e.id}" tabindex="0" role="button">
-              <p class="mono">${e.start}–${e.end}</p>
+              <p class="lbl">${e.start}–${e.end}</p>
               <h3>${esc(mine ? mine.title : e.title)}</h3>
               <p class="wk__where">${ROOM[e.room].name}</p>
               ${mine ? `<span class="tag tag--solid">Presenting · ${mine.kind}</span>` : `<button class="iconbtn wk__x" data-act="toggle" data-id="${e.id}" aria-label="Remove from my schedule">${G.close}</button>`}
-              ${clash ? `<p class="tl__clash mono">Overlaps</p>` : ''}
+              ${clash ? `<p class="tl__clash lbl">Overlaps</p>` : ''}
             </div>`;
           }).join('') : `<button class="week__empty" data-act="browse-day" data-day="${i}">${G.plus}<span>Browse ${d.dow}</span></button>`}</div>`;
         }).join('')}</div>`;
         return;
       }
-      el.innerHTML = `<div class="days" role="tablist">${DAYS.map((d, i) => `<button class="day ${i === UI.dashDay ? 'is-on' : ''}" data-act="dash-day" data-day="${i}" role="tab" aria-selected="${i === UI.dashDay}"><span class="mono">${d.dow}</span><b>${d.d}</b>${counts[i] ? `<i>${counts[i]}</i>` : ''}</button>`).join('')}</div>
+      el.innerHTML = `<div class="days" role="tablist">${DAYS.map((d, i) => `<button class="day ${i === UI.dashDay ? 'is-on' : ''}" data-act="dash-day" data-day="${i}" role="tab" aria-selected="${i === UI.dashDay}"><span class="lbl">${d.dow}</span><b>${d.d}</b>${counts[i] ? `<i>${counts[i]}</i>` : ''}</button>`).join('')}</div>
         ${today.length ? `<ol class="tl">${today.map((e, i) => {
           const mine = presentingAt(e.id);
           const clash = today.find(o => o !== e && mins(o.start) < mins(e.end) && mins(e.start) < mins(o.end));
           return `<li class="tl__item ${mine ? 'is-mine' : ''}" style="--c:${CAT[e.cat].color};--i:${i}">
-            <div class="tl__time mono"><b>${e.start}</b>${e.end}</div>
+            <div class="tl__time lbl"><b>${e.start}</b>${e.end}</div>
             <div class="tl__card" data-act="event" data-id="${e.id}" tabindex="0" role="button">
-              <p class="mono">${mine ? `<span class="tag tag--solid">Presenting · ${mine.kind}</span>` : TYPES[e.type]}</p>
+              <p class="lbl">${mine ? `<span class="tag tag--solid">Presenting · ${mine.kind}</span>` : TYPES[e.type]}</p>
               <h3>${esc(mine ? mine.title : e.title)}</h3>
               <p class="tl__where">${icon(e.cat)}${whereLabel(e.room)}${mine ? ' · ' + mine.slot.split(' · ')[0] : ''}</p>
-              ${clash ? `<p class="tl__clash mono">Overlaps with ${esc(clash.title)}</p>` : ''}
+              ${clash ? `<p class="tl__clash lbl">Overlaps with ${esc(clash.title)}</p>` : ''}
             </div>
             ${mine ? '' : `<button class="iconbtn tl__x" data-act="toggle" data-id="${e.id}" aria-label="Remove from my schedule">${G.close}</button>`}
           </li>`;
@@ -616,9 +756,9 @@
       const u = S.user;
       const why = u && e.cat === u.primary ? 'Primary interest' : u && e.cat === u.secondary ? 'Secondary interest' : e.type === 'keynote' ? 'Everyone’s there' : 'Open to all';
       return `<article class="rec" style="--c:${c.color};--on:${onColor(c.color)}" data-act="event" data-id="${e.id}" tabindex="0" role="button">
-        <div class="rec__top"><span class="rec__ico">${icon(e.cat)}</span><span class="mono">${why}</span></div>
+        <div class="rec__top"><span class="rec__ico">${icon(e.cat)}</span><span class="lbl">${why}</span></div>
         <h3>${esc(e.title)}</h3>
-        <p class="mono rec__meta">${DAYS[e.day].dow} ${e.start}–${e.end}<br>${ROOM[e.room].name}</p>
+        <p class="lbl rec__meta">${DAYS[e.day].dow} ${e.start}–${e.end}<br>${ROOM[e.room].name}</p>
         ${addBtn(e.id)}
       </article>`;
     },
@@ -632,16 +772,16 @@
         <div class="hero">
           <div class="wall" id="wall">${CATS.map((c, i) => `<button class="tile" style="--c:${c.color};--i:${i}" data-act="domain" data-cat="${c.id}" aria-label="${c.name} events">${icon(c.id)}</button>`).join('')}</div>
           <div class="hero__title">
-            <p class="mono">ACM CHI Conference on Human Factors in Computing Systems</p>
+            <p class="lbl">ACM CHI Conference on Human Factors in Computing Systems</p>
             <h1>CHI 2027<span>Bridges</span></h1>
           </div>
         </div>
 
         <div class="when">
-          <div><p class="mono">When</p><p class="when__big">May 10–14</p><p class="dim">Monday to Friday, 2027</p></div>
-          <div><p class="mono">Where</p><p class="when__big">Pittsburgh</p><p class="dim">${INFO.venue}</p></div>
+          <div><p class="lbl">When</p><p class="when__big">May 10–14</p><p class="dim">Monday to Friday, 2027</p></div>
+          <div><p class="lbl">Where</p><p class="when__big">Pittsburgh</p><p class="dim">${INFO.venue}</p></div>
           <div class="when__row">
-            ${days > 0 ? `<p class="count"><b>${days}</b><span class="mono">days<br>to go</span></p>` : `<p class="count"><b>Now</b><span class="mono">on</span></p>`}
+            ${days > 0 ? `<p class="count"><b>${days}</b><span class="lbl">days<br>to go</span></p>` : `<p class="count"><b>Now</b><span class="lbl">on</span></p>`}
             <button class="btn btn--ghost btn--sm" data-go="map">${G.pin} Open the map</button>
           </div>
         </div>
@@ -658,7 +798,7 @@
         <div class="progs">${PROGRAMS.map((p, i) => {
           const n = EVENTS.filter(e => e.type === p.type).length;
           return `<details class="prog-row" name="prog">
-            <summary><span class="mono">${String(i + 1).padStart(2, '0')}</span><b>${p.name}</b><em class="mono">${n}</em><i></i></summary>
+            <summary><span class="lbl">${String(i + 1).padStart(2, '0')}</span><b>${p.name}</b><em class="lbl">${n}</em><i></i></summary>
             <div><p>${p.line}</p><button class="btn btn--ghost btn--sm" data-act="type" data-type="${p.type}">See ${p.name.toLowerCase()} ${G.arrow}</button></div>
           </details>`;
         }).join('')}</div>
@@ -686,7 +826,7 @@
       ${logo('#/home')}
       <p>${INFO.dates}<br>${INFO.venue}<br>${INFO.address}</p>
       <nav>${NAV.map(([r, n]) => `<a href="#/${r}">${n}</a>`).join('')}</nav>
-      <p class="mono dim">CHI is sponsored by ACM SIGCHI.<br>Prototype — sessions, rooms and people are sample content.</p>
+      <p class="lbl dim">CHI is sponsored by ACM SIGCHI.<br>Prototype — sessions, rooms and people are sample content.</p>
       <button class="link" data-act="reset">Reset prototype</button>
     </footer>`;
   }
@@ -714,14 +854,14 @@
     paint() {
       const all = EVENTS.filter(e => (!UI.evCat || e.cat === UI.evCat) && (!UI.evType || e.type === UI.evType));
       const counts = DAYS.map((_, d) => all.filter(e => e.day === d).length);
-      $('#ev-days').innerHTML = DAYS.map((d, i) => `<button class="day ${i === UI.evDay ? 'is-on' : ''} ${counts[i] ? '' : 'is-empty'}" data-act="ev-day" data-day="${i}" role="tab" aria-selected="${i === UI.evDay}"><span class="mono">${d.dow}</span><b>${d.d}</b>${(UI.evCat || UI.evType) && counts[i] ? `<i>${counts[i]}</i>` : ''}</button>`).join('');
+      $('#ev-days').innerHTML = DAYS.map((d, i) => `<button class="day ${i === UI.evDay ? 'is-on' : ''} ${counts[i] ? '' : 'is-empty'}" data-act="ev-day" data-day="${i}" role="tab" aria-selected="${i === UI.evDay}"><span class="lbl">${d.dow}</span><b>${d.d}</b>${(UI.evCat || UI.evType) && counts[i] ? `<i>${counts[i]}</i>` : ''}</button>`).join('');
       $$('#ev-cats .fchip').forEach(b => b.classList.toggle('is-on', (b.dataset.cat || null) === UI.evCat));
       const list = all.filter(e => e.day === UI.evDay).sort(sortEv);
       const slots = [];
       list.forEach(e => { const s = slots[slots.length - 1]; if (s && s.start === e.start) s.items.push(e); else slots.push({ start: e.start, items: [e] }); });
       const filt = UI.evType ? `<button class="fchip is-on fchip--x" data-act="ev-type-clear">${TYPES[UI.evType]} ${G.close}</button>` : '';
-      $('#ev-list').innerHTML = `<p class="events__sum mono"><span>${dayLabel(UI.evDay)} · ${list.length} event${list.length === 1 ? '' : 's'}</span>${filt}</p>` + (list.length
-        ? slots.map((s, i) => `<div class="slot rise" style="--i:${i}"><p class="slot__t mono">${s.start}</p><div class="slot__items">${s.items.map(e => evCard(e)).join('')}</div></div>`).join('')
+      $('#ev-list').innerHTML = `<p class="events__sum lbl"><span>${dayLabel(UI.evDay)} · ${list.length} event${list.length === 1 ? '' : 's'}</span>${filt}</p>` + (list.length
+        ? slots.map((s, i) => `<div class="slot rise" style="--i:${i}"><p class="slot__t lbl">${s.start}</p><div class="slot__items">${s.items.map(e => evCard(e)).join('')}</div></div>`).join('')
         : `<div class="empty"><div class="empty__px"><i></i><i></i><i></i></div><p>No matching events on ${DAYS[UI.evDay].dow}.</p>${counts.some(Boolean) ? `<button class="btn btn--ghost btn--sm" data-act="ev-next">Jump to the next one</button>` : `<button class="btn btn--ghost btn--sm" data-act="ev-clear">Clear filters</button>`}</div>`);
     },
   };
@@ -730,7 +870,7 @@
   const About = {
     html() {
       return `${bar()}<section class="about stagger">
-        <p class="mono">About</p>
+        <p class="lbl">About</p>
         <h1 class="display">Where people<br>and technology<br>meet.</h1>
         <p class="lede">The ACM CHI Conference on Human Factors in Computing Systems is the leading international conference on human–computer interaction.</p>
         <p>CHI 2027 comes to Pittsburgh — a city that moved from steel to culture and technology — under the theme <b>bridges</b>. The week brings together papers, posters, interactive demos, panels, workshops and meet-ups, all under one roof at the ${INFO.venue}, the first LEED-certified convention center in North America.</p>
@@ -830,6 +970,16 @@
     },
     logout() { S.user = null; S.mode = null; save(); go(''); toast('Logged out'); },
     reset() { S = blank(); save(); UI.setup = newSetup(); UI.evCat = UI.evType = null; UI.evDay = UI.dashDay = 0; go(''); toast('Prototype reset'); },
+    'cb-edit'() { Dashboard.openEditor(); },
+    'cb-add'() { const f = $('#cb-file'); f && f.click(); },
+    'cb-rm'(el) { creativeOf(S.user).images.splice(+el.dataset.i, 1); save(); Dashboard.paintEditor(); },
+    'cb-reset'() { creativeOf(S.user).bio = ''; save(); Dashboard.paintEditor(); },
+    'cb-shuffle'() {
+      const cr = creativeOf(S.user), faces = $$('#cb, #cb-prev');
+      cr.seed = cr.seed % 9000 + 1; save();
+      faces.forEach(el => el.classList.add('is-swap'));
+      setTimeout(() => { Dashboard.drawCreative(); faces.forEach(el => el.classList.remove('is-swap')); }, FX.reduced ? 0 : 160);
+    },
     toggle(el) { toggleSched(el.dataset.id); },
     'toggle-sheet'(el) {
       toggleSched(el.dataset.id);
@@ -875,9 +1025,25 @@
   document.addEventListener('input', e => {
     const t = e.target;
     if (t.dataset && t.dataset.in) { UI.setup[t.dataset.in] = t.value; Setup.gate(); if (t.dataset.in === 'email') Setup.paintMatch(); }
+    if (t.id === 'cb-bio' && S.user) {
+      // hold the sentence to the word cap as it is typed or pasted
+      const cap = Creative.BIO_WORDS, words = t.value.split(/\s+/).filter(Boolean);
+      if (words.length > cap) t.value = words.slice(0, cap).join(' ');
+      else if (words.length === cap && /\s$/.test(t.value)) t.value = t.value.replace(/\s+$/, '');
+      const cr = creativeOf(S.user), ints = interestsOf(S.user);
+      const mine = t.value.replace(/\s+/g, ' ').trim();
+      cr.bio = mine && mine !== Creative.defaultBio(S.user, ints) ? mine : ''; // '' = follow the suggested sentence
+      save();
+      const n = Math.min(words.length, cap), c = $('#cb-count'), r = $('.cbe__reset');
+      if (c) { c.textContent = `${n} / ${cap} words`; c.classList.toggle('is-full', n >= cap); }
+      if (r) r.hidden = !cr.bio;
+      const face = $('#cb'); if (face) face.setAttribute('aria-label', Creative.bioText(S.user, ints));
+      Dashboard.drawCreative();
+    }
   });
   document.addEventListener('change', e => {
     const t = e.target;
+    if (t.id === 'cb-file' && S.user) { addImages(t.files); return; }
     if (t.dataset && t.dataset.check) {
       S.checks[t.dataset.check] = t.checked; save();
       const pid = t.dataset.check.split(':')[0];

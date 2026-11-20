@@ -57,13 +57,11 @@
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
   const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
   const BR = [hex(BRAND.g), hex(BRAND.r), hex(BRAND.b)];
-  // Brand blue is too dark to read as a pixel on black — lift it slightly for particles only.
-  const BR_LIT = [BR[0], BR[1], [40, 60, 255]];
 
   /** Weighted blend of the three brand colours. w = [communities, methods, behaviors]. */
   FX.mixColor = function (w) {
     const s = (w[0] + w[1] + w[2]) || 1;
-    const c = [0, 1, 2].map(k => (BR_LIT[0][k] * w[0] + BR_LIT[1][k] * w[1] + BR_LIT[2][k] * w[2]) / s);
+    const c = [0, 1, 2].map(k => (BR[0][k] * w[0] + BR[1][k] * w[1] + BR[2][k] * w[2]) / s);
     // normalise so the blend stays vivid on black
     const mx = Math.max(c[0], c[1], c[2]) || 1;
     return rgb(c.map(v => v * (235 / mx)));
@@ -160,22 +158,17 @@
             const shimmer = reduced ? 1 : 0.94 + 0.06 * Math.sin(now / 520 + cx * 0.7 + cy * 0.45);
             let s = cell * (0.28 + 0.62 * v) * shimmer;
             let c = col;
-            if (brandIdx >= 0) c = BR_LIT[brandIdx];
-            if (near > 0.25) { c = BR_LIT[pickBrand([1, 1, 1], h2(cx, cy))]; s *= 1 - near * 0.35; }
+            if (brandIdx >= 0) c = BR[brandIdx];
+            if (near > 0.25) { c = BR[pickBrand([1, 1, 1], h2(cx, cy))]; s *= 1 - near * 0.35; }
             let px = x, py = y;
             if (off) { const a = Math.atan2(y - ptr.y, x - ptr.x); px += Math.cos(a) * off; py += Math.sin(a) * off; }
             ctx.fillStyle = rgb(c);
             if (v < 0.62 || near > 0.25) { ctx.beginPath(); ctx.arc(px, py, s / 2, 0, 6.2832); ctx.fill(); }
             else ctx.fillRect(px - s / 2, py - s / 2, s, s);
           } else {
-            // background lattice + the odd stray brand pixel
-            const stray = !reduced && h2(cx * 131 + cy, tick) < 0.012;
-            if (stray) {
-              ctx.fillStyle = rgb(BR_LIT[pickBrand([1, 1, 1], h2(cx, cy + tick))]);
-              const s = cell * 0.5;
-              ctx.fillRect(x - s / 2, y - s / 2, s, s);
-            } else if (near > 0.05) {
-              ctx.fillStyle = rgb(BR_LIT[pickBrand([1, 1, 1], h2(cx, cy))]);
+            // background lattice
+            if (near > 0.05) {
+              ctx.fillStyle = rgb(BR[pickBrand([1, 1, 1], h2(cx, cy))]);
               ctx.globalAlpha = near;
               ctx.beginPath(); ctx.arc(x, y, cell * 0.22, 0, 6.2832); ctx.fill();
               ctx.globalAlpha = 1;
@@ -246,7 +239,7 @@
           p2: [x0 + b3x * cell, y0 + b3y * cell],
           p3: [x0 + (x + 0.5) * cell, y0 + (y + 0.5) * cell],
           j: h2(k, 10),
-          c: BR_LIT[pickBrand(opts.mix, h2(k, 11))],
+          c: BR[pickBrand(opts.mix, h2(k, 11))],
         });
       }
     }

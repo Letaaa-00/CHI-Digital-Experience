@@ -2,7 +2,7 @@
    Conference facts (dates, city, venue, theme, programs) follow chi2027.acm.org / chi2026.acm.org.
    Sessions, people and rooms are illustrative placeholders. */
 (function () {
-  const BRAND = { g: '#76FF4F', r: '#EB3323', b: '#0000FF' };
+  const BRAND = { g: '#00FF00', r: '#FF0000', b: '#0000FF' };
 
   // mix = [communities, new methods, human behaviors] — from the brand colour study.
   const CATS = [
@@ -119,6 +119,7 @@
     ['e30', 3, '11:15', '12:45', 'journals', 'design', 'r306', 'Journals: Recent Articles, Live', 'Authors of recently published journal articles present and take questions.', '6 articles', 0],
     ['e31', 3, '14:15', '15:45', 'workshop', 'playful', 'r401', 'Playful Research Methods', 'Card decks, improv and toys as serious instruments.', 'Organisers: Q. Lemaire, U. Baptiste', 0],
     ['e32', 3, '14:15', '15:45', 'papers', 'privacy', 'r303', 'Security Behaviors in the Wild', 'Passwords, scams and the workarounds people actually use.', 'Chair: X. Volkov', 0],
+    ['e40', 3, '14:15', '15:45', 'papers', 'dataviz', 'r304', 'Visualization Literacy', 'How people learn to read, question and make charts.', 'Chair: A. Lindholm', 0],
     ['e33', 3, '16:30', '18:00', 'meetup', 'access', 'r404', 'Accessibility Community Mixer', 'Open to everyone working on or curious about access. Quiet room next door.', 'Community-run', 1],
     ['e34', 3, '19:00', '22:00', 'social', 'playful', 'terrace', 'Conference Night on the Riverfront', 'Music, food and a view of the bridges at dusk.', 'All badges welcome', 1],
 

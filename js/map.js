@@ -89,7 +89,7 @@
             ${PEOPLE.map((p, i) => `<button class="mark mark--dot" data-act="map-person" data-i="${i}" data-cat="${p.cat}" data-x="${p.x.toFixed(1)}" data-y="${p.y.toFixed(1)}" style="--c:${CAT[p.cat].color};--d:${(i % 9) * 22}ms" aria-label="${p.name}, ${CAT[p.cat].name}"><span></span></button>`).join('')}
           </div>
           <div class="map__status"><b id="mmode">Crowd overview</b><span>${PEOPLE.length} people · ${CLUSTERS.length} groups</span></div>
-          <p class="map__hint mono" id="mhint">Pinch or tap + to zoom</p>
+          <p class="map__hint lbl" id="mhint">Pinch or tap + to zoom</p>
           <div class="map__ctl">
             <button data-act="map-zoom" data-d="1" aria-label="Zoom in">+</button>
             <button data-act="map-zoom" data-d="-1" aria-label="Zoom out">−</button>
@@ -120,7 +120,7 @@
             <button data-act="map-zoom3" data-d="1" aria-label="Zoom in">+</button>
             <button data-act="map-zoom3" data-d="-1" aria-label="Zoom out">−</button>
           </div>
-          <p class="map__hint map__hint--3d mono">Drag to rotate · tap a level</p>
+          <p class="map__hint map__hint--3d lbl">Drag to rotate · tap a level</p>
           <div class="map__panel" id="mpanel"></div>
         </div>
       </section>`;
@@ -335,19 +335,19 @@
     if (st.room) {
       const r = ROOM[st.room], f = FLOORS[r.floorIndex];
       const evs = EVENTS.filter(e => e.room === r.id);
-      panel.innerHTML = `<div class="panel__h"><button class="iconbtn" data-act="map-room" data-room="" aria-label="Back to ${f.name}">${A.G.back}</button><div><p class="mono">${f.name} · ${f.label}</p><h3>${r.name}</h3></div></div>
+      panel.innerHTML = `<div class="panel__h"><button class="iconbtn" data-act="map-room" data-room="" aria-label="Back to ${f.name}">${A.G.back}</button><div><p class="lbl">${f.name} · ${f.label}</p><h3>${r.name}</h3></div></div>
         <div class="panel__list">${evs.length ? evs.map(e => `<div class="pev" style="--c:${CAT[e.cat].color}" data-act="event" data-id="${e.id}" role="button" tabindex="0">
             <span class="pev__ico">${A.icon(e.cat)}</span>
-            <span class="pev__t"><span class="mono">${DAYS[e.day].dow} ${e.start}–${e.end} · ${TYPES[e.type]}</span><b>${A.esc(e.title)}</b></span>
+            <span class="pev__t"><span class="lbl">${DAYS[e.day].dow} ${e.start}–${e.end} · ${TYPES[e.type]}</span><b>${A.esc(e.title)}</b></span>
             ${A.addBtn(e.id)}
           </div>`).join('') : '<p class="dim panel__none">Nothing scheduled here — a good place to catch your breath.</p>'}</div>`;
     } else if (fi >= 0) {
       const f = FLOORS[fi];
-      panel.innerHTML = `<div class="panel__h"><div><p class="mono">${f.label}</p><h3>${f.name}</h3></div><span class="mono dim">${f.rooms.length} spaces</span></div>
-        <div class="panel__rooms">${f.rooms.map(r => { const n = EVENTS.filter(e => e.room === r.id).length; return `<button class="proom" data-act="map-room" data-room="${r.id}" style="--c:${roomColor(r.id)}"><i></i><b>${r.name}</b><span class="mono">${n ? n + ' event' + (n > 1 ? 's' : '') : '—'}</span></button>`; }).join('')}</div>`;
+      panel.innerHTML = `<div class="panel__h"><div><p class="lbl">${f.label}</p><h3>${f.name}</h3></div><span class="lbl dim">${f.rooms.length} spaces</span></div>
+        <div class="panel__rooms">${f.rooms.map(r => { const n = EVENTS.filter(e => e.room === r.id).length; return `<button class="proom" data-act="map-room" data-room="${r.id}" style="--c:${roomColor(r.id)}"><i></i><b>${r.name}</b><span class="lbl">${n ? n + ' event' + (n > 1 ? 's' : '') : '—'}</span></button>`; }).join('')}</div>`;
     } else {
-      panel.innerHTML = `<div class="panel__h"><div><p class="mono">David L. Lawrence Convention Center</p><h3>Four levels, one roof</h3></div></div>
-        <div class="panel__rooms">${FLOORS.slice().reverse().map(f => `<button class="proom" data-act="map-floor" data-floor="${f.id}" style="--c:#fff"><i></i><b>${f.name} · ${f.label}</b><span class="mono">${f.rooms.length} spaces</span></button>`).join('')}</div>`;
+      panel.innerHTML = `<div class="panel__h"><div><p class="lbl">David L. Lawrence Convention Center</p><h3>Four levels, one roof</h3></div></div>
+        <div class="panel__rooms">${FLOORS.slice().reverse().map(f => `<button class="proom" data-act="map-floor" data-floor="${f.id}" style="--c:#fff"><i></i><b>${f.name} · ${f.label}</b><span class="lbl">${f.rooms.length} spaces</span></button>`).join('')}</div>`;
     }
     panel.classList.remove('rise'); void panel.offsetWidth; panel.classList.add('rise');
   }
@@ -369,7 +369,7 @@
       $$('.mark--dot.is-sel').forEach(d => d.classList.remove('is-sel'));
       el.classList.add('is-sel');
       card.style.setProperty('--c', c.color);
-      card.innerHTML = `<span class="pcard__ico">${A.icon(p.cat)}</span><div><b>${p.name}</b><span class="mono">${c.name}</span><p>${p.note}</p></div><button class="btn btn--primary btn--sm" data-act="map-wave" data-i="${el.dataset.i}">Say hi</button>`;
+      card.innerHTML = `<span class="pcard__ico">${A.icon(p.cat)}</span><div><b>${p.name}</b><span class="lbl">${c.name}</span><p>${p.note}</p></div><button class="btn btn--primary btn--sm" data-act="map-wave" data-i="${el.dataset.i}">Say hi</button>`;
       card.hidden = false; card.classList.remove('rise'); void card.offsetWidth; card.classList.add('rise');
     },
     'map-wave'(el) { A.toast(`You waved at ${PEOPLE[+el.dataset.i].name.split(' ')[0]}`); hideCard(); },

@@ -18,8 +18,8 @@ then visit http://localhost:4127.
 - **Join** — Attendee, Visitor or Guest mode.
 - **Interest questions** — badge (name, email), role, a three-way interest mix, topic picks.
 - **Icon reveal** — primary and secondary interest icons.
-- **Account dashboard** — a simple badge (interest icons and name), My Presentations, My Schedule, suggested events.
-- **Creative badge** — optional back of the badge: a collage of the person's name, short bio (10 words), interests, uploaded images and random graphics. Press and hold the badge to flip it.
+- **Account dashboard** — a simple badge (interest icons and name), My Presentations, My Schedule, suggested events. Everyone starts with their two closest interests; a further one joins the badge after three events from that domain are saved.
+- **Creative badge** — the back of the badge (click to flip): the person's bio sentence (editable, 20 words) set as a tight collage with their interest icons, uploaded images and random graphics, name largest, centred on the card. The edit button at its bottom right opens the editor.
 - **Home, Events, About** and a **Map** with a 2D crowd view and a 3D floor breakout.
 
 Sample presenter emails (fill My Presentations automatically): `alex.rivera@example.org`, `sam.okonkwo@example.org`. Any password works.
