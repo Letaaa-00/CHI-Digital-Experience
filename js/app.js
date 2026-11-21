@@ -24,6 +24,7 @@
     back: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H5M11 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
     plus: '<svg class="g g-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>',
     check: '<svg class="g g-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6"/></svg>',
+    qr: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14 14h2v2h-2zM18 14h2v2h-2zM16 16h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" fill="currentColor"/></svg>',
     close: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
     pin: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.800 12 21 12 21z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9.500" r="2.200" fill="currentColor"/></svg>',
     edit: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19.500 8.500l-4-4L4 16v4zM13 7l4 4" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
@@ -63,7 +64,7 @@
   }
   const wide = window.matchMedia('(min-width: 760px)');
   const split = window.matchMedia('(min-width: 900px)');
-  const secHead = (n, title, extra) => `<div class="sec-h"><span class="lbl">${n}</span><h2>${title}</h2>${extra || ''}</div>`;
+  const secHead = (title, extra) => `<div class="sec-h"><h2>${title}</h2>${extra || ''}</div>`;
 
   /* ---------- schedule ---------- */
   const myPresentations = () => (S.user && S.user.presenter && PRESENTERS[S.user.email] ? PRESENTERS[S.user.email].presentations : []);
@@ -113,7 +114,7 @@
         <p class="lbl ev__meta"><span>${opts.day ? DAYS[e.day].dow + ' ' : ''}${e.start}–${e.end}</span><span>${TYPES[e.type]}</span></p>
         <h3>${esc(e.title)}</h3>
         <p class="ev__where">${ROOM[e.room].name}</p>
-        ${mine ? `<span class="tag tag--solid">You’re presenting</span>` : ''}${e.open && S.mode === 'visitor' ? `<span class="tag">Open to visitors</span>` : ''}
+        ${mine ? `<span class="tag tag--solid">You’re presenting</span>` : ''}${e.apply ? `<span class="tag">Apply to join</span>` : ''}
       </div>
       ${addBtn(e.id)}
     </article>`;
@@ -148,6 +149,7 @@
 
   function eventSheet(id) {
     const e = EVENT[id], c = CAT[e.cat], mine = presentingAt(id);
+    const onMap = parts()[0] === 'map'; // already on the map: no need to send them there
     openSheet(`<div class="evd" style="--c:${c.color}">
       <div class="evd__top"><div class="evd__ico">${icon(e.cat)}</div><p class="lbl">${TYPES[e.type]}<br><span>${c.name}</span></p></div>
       <h2>${esc(e.title)}</h2>
@@ -157,11 +159,11 @@
         <div><dt>When</dt><dd>${dayLabel(e.day)}<br>${e.start} – ${e.end}</dd></div>
         <div><dt>Where</dt><dd>${ROOM[e.room].name}<br>${floorOf(e.room).name}</dd></div>
         <div><dt>Who</dt><dd>${esc(e.people)}</dd></div>
-        ${e.open ? '<div><dt>Access</dt><dd>Open to visitors</dd></div>' : ''}
+        <div><dt>Access</dt><dd>${e.apply ? 'Attendees and visitors · separate application required' : 'Open to attendees and visitors'}</dd></div>
       </dl>
       <div class="evd__actions">
         ${mine ? '' : `<button class="btn btn--primary ${inSched(id) ? 'is-on' : ''}" data-act="toggle-sheet" data-id="${id}">${inSched(id) ? 'In my schedule — remove' : 'Add to my schedule'}</button>`}
-        <button class="btn btn--ghost" data-go="map/room/${e.room}">${G.pin} Find the room</button>
+        ${onMap ? '' : `<button class="btn btn--ghost" data-go="map/room/${e.room}">${G.pin} Find the room</button>`}
       </div>
     </div>`);
   }
@@ -259,8 +261,7 @@
   function recommend(limit) {
     const u = S.user;
     let pool = EVENTS.filter(e => !inSched(e.id) && !presentingAt(e.id));
-    if (S.mode === 'visitor') pool = pool.filter(e => e.open);
-    const w = e => (u ? (e.cat === u.primary ? 5 : e.cat === u.secondary ? 2.5 : 0) : 0) + (e.type === 'keynote' ? 1.5 : 0) + (e.open ? 0.5 : 0);
+    const w = e => (u ? (e.cat === u.primary ? 5 : e.cat === u.secondary ? 2.5 : 0) : 0) + (e.type === 'keynote' ? 1.5 : 0);
     return pool.map(e => [w(e), e]).filter(x => x[0] > 0).sort((a, b) => b[0] - a[0] || sortEv(a[1], b[1])).slice(0, limit).map(x => x[1]);
   }
 
@@ -313,7 +314,7 @@
   const Join = {
     html() {
       return `<section class="join stagger">
-        ${bar({ back: '', right: '<span class="lbl dim">Join</span>', cls: 'bar--clear' })}
+        ${bar({ back: '', right: '', cls: 'bar--clear' })}
         <h1 class="display">How are you<br>joining us?</h1>
         <button class="role" data-act="mode" data-mode="attendee" style="--c:var(--g)">
           <span class="lbl">Attendee</span>
@@ -326,15 +327,12 @@
           <span class="lbl">Visitor</span>
           <span class="role__glyph"><i class="ci"></i><i class="ci ci--o"></i></span>
           <b>I’m a visitor.</b>
-          <span class="role__line">Browse community activities that are open to visitors.</span>
+          <span class="role__line">Explore talks, demos, meet-ups and receptions — all open to visitors.</span>
           <span class="role__go">${G.arrow}</span>
         </button>
-        <button class="role role--slim" data-act="mode" data-mode="guest" style="--c:var(--b);--on:#fff">
-          <span class="lbl">Guest mode</span>
-          <b>Just looking around.</b>
-          <span class="role__line">No account. Go straight to the conference home.</span>
-          <span class="role__go">${G.arrow}</span>
-        </button>
+        <div class="join__guest">
+          <button class="btn btn--text" data-act="mode" data-mode="guest">Just looking around? <u>Continue as guest</u></button>
+        </div>
       </section>`;
     },
   };
@@ -557,13 +555,55 @@
     },
   };
 
+  /* ---------- ticket ----------
+     A stand-in QR code: it has a real code's finder squares, timing lines and alignment block so it reads as one,
+     but the rest is a pattern drawn from the email address, so it is the same every time for the same person
+     and scans as nothing. */
+  function fakeQR(seed) {
+    const N = 25, m = Array.from({ length: N }, () => Array(N).fill(null));
+    let h = 2166136261; for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+    const rnd = () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296;
+    const finder = (r0, c0) => {
+      for (let r = -1; r <= 7; r++) for (let c = -1; c <= 7; c++) {
+        const y = r0 + r, x = c0 + c; if (y < 0 || x < 0 || y >= N || x >= N) continue;
+        const ring = Math.max(Math.abs(r - 3), Math.abs(c - 3));
+        m[y][x] = r >= 0 && r <= 6 && c >= 0 && c <= 6 && ring !== 2;
+      }
+    };
+    finder(0, 0); finder(0, N - 7); finder(N - 7, 0);
+    for (let i = 8; i < N - 8; i++) { m[6][i] = i % 2 === 0; m[i][6] = i % 2 === 0; }
+    for (let r = -2; r <= 2; r++) for (let c = -2; c <= 2; c++) m[18 + r][18 + c] = Math.max(Math.abs(r), Math.abs(c)) !== 1;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (m[y][x] === null) m[y][x] = rnd() < 0.5;
+    let path = '';
+    m.forEach((row, y) => row.forEach((on, x) => { if (on) path += `M${x + 4} ${y + 4}h1v1h-1z`; }));
+    return `<svg class="ticket__qr" viewBox="0 0 33 33" role="img" aria-label="Ticket code" shape-rendering="crispEdges"><rect width="33" height="33" fill="#fff"/><path d="${path}" fill="#000"/></svg>`;
+  }
+  function ticketSheet() {
+    const u = S.user; if (!u) return;
+    const kind = S.mode === 'visitor' ? 'Visitor' : u.presenter ? 'Presenter' : 'Attendee';
+    const seed = (u.email || u.name || 'guest').toLowerCase();
+    let n = 0; for (const ch of seed) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
+    const id = `CHI27-${kind[0]}-${n.toString(36).toUpperCase().padStart(6, '0').slice(-6)}`;
+    openSheet(`<div class="ticket">
+      <p class="lbl">CHI 2027 · ${kind}</p>
+      <h2>${esc(u.name)}</h2>
+      ${fakeQR(seed)}
+      <p class="ticket__id lbl">${id}</p>
+      <dl class="kv">
+        <div><dt>When</dt><dd>${INFO.dates}</dd></div>
+        <div><dt>Where</dt><dd>${INFO.venue}</dd></div>
+      </dl>
+      <p class="hint">Show this at registration and session doors.</p>
+    </div>`);
+  }
+
   /* ---------- 6. Dashboard (account page) ---------- */
   const Dashboard = {
     html() {
       const u = S.user;
       return `${bar()}<section class="dash">
         <div class="dash__side">
-        ${secHead('01', 'Profile')}
+        ${secHead('Profile')}
         ${u ? `<div id="dash-profile">${Dashboard.badge()}</div>` : `<div class="guestcard">
             <p class="lbl">Guest mode</p>
             <h3>You’re browsing without a badge.</h3>
@@ -572,10 +612,10 @@
           </div>`}
         </div>
         <div class="dash__main">
-        ${u && S.mode !== 'visitor' ? secHead('02', 'My Presentations') + `<div id="dash-pres">${Dashboard.presHTML()}</div>` : ''}
-        ${secHead(u && S.mode !== 'visitor' ? '03' : '02', 'My Schedule', `<button class="link" data-go="events">Browse all</button>`)}
+        ${u && S.mode !== 'visitor' ? secHead('My Presentations') + `<div id="dash-pres">${Dashboard.presHTML()}</div>` : ''}
+        ${secHead('My Schedule', `<button class="link" data-go="events">Browse all</button>`)}
         <div id="dash-sched"></div>
-        ${secHead(u && S.mode !== 'visitor' ? '04' : '03', 'Events that might interest you')}
+        ${secHead('Events that might interest you')}
         <div id="dash-recs">${Dashboard.recsHTML()}</div>
         </div>
         <p class="dash__end lbl dim">${INFO.dates} · ${INFO.venue}</p>
@@ -608,6 +648,7 @@
         </div>
       </div>
       <div class="dash__mix">${mixBar(u.mix, true)}</div>
+      <div class="dash__ticket"><button class="btn btn--primary" data-act="ticket">${G.qr} Show my ticket</button></div>
       <div class="dash__actions"><button class="btn btn--ghost btn--sm" data-act="retake">Retake interests</button><button class="btn btn--ghost btn--sm" data-go="icon">Show my icon</button><button class="btn btn--text btn--sm" data-act="logout">Log out</button></div>`;
     },
     // the editor for the creative side, shown in the sheet with a small live preview
@@ -746,7 +787,7 @@
     recsHTML() {
       const recs = recommend(8);
       if (!recs.length) {
-        const fallback = EVENTS.filter(e => e.open && !inSched(e.id)).slice(0, 6);
+        const fallback = EVENTS.filter(e => e.type !== 'papers' && !inSched(e.id)).slice(0, 6);
         return `<div class="recs">${fallback.map(Dashboard.recCard).join('')}</div>`;
       }
       return `<div class="recs">${recs.map(Dashboard.recCard).join('')}</div>`;
@@ -774,6 +815,9 @@
           <div class="hero__title">
             <p class="lbl">ACM CHI Conference on Human Factors in Computing Systems</p>
             <h1>CHI 2027<span>Bridges</span></h1>
+            ${S.user ? '' : `<div class="home__join">
+              <button class="btn btn--primary" data-go="join">Join CHI 2027 ${G.arrow}</button>
+            </div>`}
           </div>
         </div>
 
@@ -786,7 +830,7 @@
           </div>
         </div>
 
-        ${secHead('01', 'About CHI 2027')}
+        ${secHead('About CHI 2027')}
         <div class="about-s">
           <p class="lede">CHI is the leading international conference on human–computer interaction. For five days in May, researchers, designers and makers meet in Pittsburgh to share how people and technology shape each other.</p>
           <p>This year’s theme is <b>bridges</b> — after the city’s yellow river crossings, and the connections CHI builds between disciplines, communities and ideas.</p>
@@ -794,7 +838,7 @@
           <button class="btn btn--ghost btn--sm" data-go="about">More about CHI ${G.arrow}</button>
         </div>
 
-        ${secHead('02', 'Discover CHI')}
+        ${secHead('Discover CHI')}
         <div class="progs">${PROGRAMS.map((p, i) => {
           const n = EVENTS.filter(e => e.type === p.type).length;
           return `<details class="prog-row" name="prog">
@@ -803,7 +847,7 @@
           </details>`;
         }).join('')}</div>
 
-        ${secHead('03', 'Browse by domain')}
+        ${secHead('Browse by domain')}
         <div class="domains">${CATS.map(c => `<button class="domain" style="--c:${c.color}" data-act="domain" data-cat="${c.id}">${icon(c.id)}<span>${c.name}</span></button>`).join('')}</div>
 
         ${footer()}
@@ -825,9 +869,7 @@
     return `<footer class="foot">
       ${logo('#/home')}
       <p>${INFO.dates}<br>${INFO.venue}<br>${INFO.address}</p>
-      <nav>${NAV.map(([r, n]) => `<a href="#/${r}">${n}</a>`).join('')}</nav>
       <p class="lbl dim">CHI is sponsored by ACM SIGCHI.<br>Prototype — sessions, rooms and people are sample content.</p>
-      <button class="link" data-act="reset">Reset prototype</button>
     </footer>`;
   }
 
@@ -875,15 +917,19 @@
         <p class="lede">The ACM CHI Conference on Human Factors in Computing Systems is the leading international conference on human–computer interaction.</p>
         <p>CHI 2027 comes to Pittsburgh — a city that moved from steel to culture and technology — under the theme <b>bridges</b>. The week brings together papers, posters, interactive demos, panels, workshops and meet-ups, all under one roof at the ${INFO.venue}, the first LEED-certified convention center in North America.</p>
 
-        ${secHead('01', 'Three threads')}
+        ${secHead('Three threads')}
         <p>Everything at CHI pulls on three threads. They are also the three brand colours.</p>
         <ul class="pillars pillars--big">${PILLARS.map(p => `<li><i style="background:${p.color}"></i><b>${p.name}</b><span>${p.line}</span></li>`).join('')}</ul>
 
-        ${secHead('02', 'Twelve domains')}
+        ${secHead('Twelve domains')}
         <p>Each domain is a different mix of the three threads — which is where its colour comes from. Tap one to see its events.</p>
         <div class="mixes">${CATS.map(c => `<button class="mixrow" style="--c:${c.color}" data-act="domain" data-cat="${c.id}">${icon(c.id)}<span><b>${c.name}</b>${mixBar(c.mix)}</span></button>`).join('')}</div>
 
-        ${secHead('03', 'The venue')}
+        ${secHead('Ways to take part')}
+        <ul class="kinds">${PROGRAMS.map(p => `<li><b>${p.name}</b><span>${p.short}</span></li>`).join('')}</ul>
+        <p class="hint">Everything is open to attendees and visitors.</p>
+
+        ${secHead('The venue')}
         <dl class="kv kv--stack">
           <div><dt>Dates</dt><dd>${INFO.dates} · Monday to Friday</dd></div>
           <div><dt>Venue</dt><dd>${INFO.venue}<br><span class="dim">${INFO.address}</span></dd></div>
@@ -899,6 +945,84 @@
      Router + actions
      ====================================================================== */
   const SCREENS = { '': Landing, join: Join, setup: Setup, icon: Reveal, login: Login, dashboard: Dashboard, home: Home, events: Events, about: About };
+  /* Scroll-linked reveals. As a section scrolls up from the bottom edge, its heading types out letter by letter
+     and its content fades up; everything is fully shown by the time it reaches the middle of the screen.
+     Each piece plays once: it never goes backwards, and once fully shown it stays shown, including when the
+     reader comes back to the page later in the same visit (until the page is reloaded).
+     Sections already in the top three-quarters of the screen when a page opens are left alone,
+     and nothing moves until the reader's first scroll. */
+  const ScrollReveal = (() => {
+    const on = !FX.reduced;
+    let heads = [], items = [], scrolled = false, frame = 0;
+    const seen = new Set(); // keys of headings and items already fully shown
+    const clamp = v => (v < 0 ? 0 : v > 1 ? 1 : v);
+    // 0 when the element's top is at the bottom edge, 1 once it reaches the middle
+    // (or the highest point it can reach, for anything near the end of a short page)
+    function progress(el, box) {
+      if (!scrolled) return 0;
+      const top = el.getBoundingClientRect().top;
+      const end = Math.max(box.top + box.height / 2, top - (app.scrollHeight - app.clientHeight - app.scrollTop));
+      return clamp((box.bottom - top) / Math.max(1, box.bottom - end));
+    }
+    function update() {
+      frame = 0;
+      const box = app.getBoundingClientRect();
+      heads = heads.filter(h => h.el.isConnected && !h.done);
+      items = items.filter(it => it.el.isConnected && !it.done);
+      heads.forEach(h => {
+        const p = Math.max(h.p, progress(h.el, box)); // never goes backwards
+        if (p === h.p && h.k >= 0) return;
+        h.p = p;
+        const k = Math.round(p * h.chars.length);
+        h.k = k;
+        h.chars.forEach((c, i) => { c.classList.toggle('on', i < k); c.classList.toggle('cur', p > 0 && i === k); });
+        h.lbl && (h.lbl.style.opacity = clamp(p * 4));
+        h.rest.forEach(x => { x.style.opacity = clamp((p - 0.75) * 4); });
+        if (p >= 1) { h.done = true; seen.add(h.key); h.lbl && (h.lbl.style.opacity = ''); h.rest.forEach(x => { x.style.opacity = ''; }); }
+      });
+      items.forEach(it => {
+        const p = Math.max(it.p, progress(it.el, box));
+        if (p === it.p) return;
+        it.p = p;
+        it.el.style.opacity = p >= 1 ? '' : p;
+        it.el.style.transform = p >= 1 ? '' : `translateY(${((1 - p) * 18).toFixed(1)}px)`;
+        if (p >= 1) { it.done = true; seen.add(it.key); }
+      });
+    }
+    const queue = () => { if (!frame) frame = requestAnimationFrame(update); };
+    if (on) {
+      app.addEventListener('scroll', () => { scrolled = true; queue(); }, { passive: true });
+      window.addEventListener('resize', queue);
+    }
+    return {
+      scan(root) {
+        if (!on) return;
+        heads = []; items = []; scrolled = false;
+        if (app.scrollHeight - app.clientHeight < 40) return; // page doesn't really scroll: show everything
+        const box = app.getBoundingClientRect(), line = box.top + box.height * 0.75;
+        const below = el => el.getBoundingClientRect().top >= line;
+        const page = location.hash || '#/';
+        root.querySelectorAll('.sec-h').forEach(sh => {
+          const h2 = sh.querySelector('h2');
+          if (!h2 || !below(sh)) return;
+          const text = h2.textContent, key = page + '|h|' + text;
+          if (seen.has(key)) return;
+          h2.setAttribute('aria-label', text);
+          h2.innerHTML = [...text].map(ch => `<span class="ch" aria-hidden="true">${esc(ch)}</span>`).join('');
+          const rest = [...sh.children].filter(x => x !== h2 && !x.classList.contains('lbl'));
+          heads.push({ el: sh, key, chars: [...h2.children], lbl: sh.querySelector(':scope > .lbl'), rest, k: -1, p: 0 });
+        });
+        root.querySelectorAll('.about-s, .progs, .domains, .recs').forEach((list, li) => {
+          [...list.children].forEach((c, i) => {
+            const key = page + '|i|' + li + '.' + i;
+            if (!seen.has(key) && below(c)) items.push({ el: c, key, p: -1 });
+          });
+        });
+        update();
+      },
+    };
+  })();
+
   let leave = null;
   const parts = () => location.hash.replace(/^#\/?/, '').split('/');
   const current = () => parts()[0] || '';
@@ -912,6 +1036,7 @@
     app.innerHTML = screen.html(p.slice(1));
     app.scrollTop = 0;
     leave = (screen.mount && screen.mount(p.slice(1))) || null;
+    ScrollReveal.scan(app);
   }
   function go(r) { if (location.hash === '#/' + r) render(); else location.hash = '#/' + r; }
 
@@ -981,6 +1106,7 @@
       setTimeout(() => { Dashboard.drawCreative(); faces.forEach(el => el.classList.remove('is-swap')); }, FX.reduced ? 0 : 160);
     },
     toggle(el) { toggleSched(el.dataset.id); },
+    ticket() { ticketSheet(); },
     'toggle-sheet'(el) {
       toggleSched(el.dataset.id);
       const on = inSched(el.dataset.id);
