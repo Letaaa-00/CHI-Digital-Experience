@@ -5,18 +5,22 @@
   const BRAND = { g: '#00FF00', r: '#FF0000', b: '#0000FF' };
 
   // mix = [communities, new methods, human behaviors] — from the brand colour study.
+  // sym marks the icons that look the same mirrored left-to-right and top-to-bottom. Only those turn when an
+  // icon animates; the rest stay upright, because a quarter turn would make them read as a different mark.
+  // (Measured from the artwork: these five differ from their mirror images by under 3% of their area;
+  // the next closest, Design, by 7%.)
   const CATS = [
     { id: 'ai',       name: 'AI + Human Interaction',            mix: [5, 65, 30] },
     { id: 'access',   name: 'Accessibility',                     mix: [30, 15, 55] },
-    { id: 'health',   name: 'Health + Wellbeing',                mix: [20, 5, 75] },
-    { id: 'edu',      name: 'Education',                         mix: [55, 20, 25] },
-    { id: 'social',   name: 'Social Computing',                  mix: [75, 5, 20] },
+    { id: 'health',   name: 'Health + Wellbeing',                mix: [20, 5, 75],  sym: true },
+    { id: 'edu',      name: 'Education',                         mix: [55, 20, 25], sym: true },
+    { id: 'social',   name: 'Social Computing',                  mix: [75, 5, 20],  sym: true },
     { id: 'design',   name: 'Design + Experience',               mix: [20, 45, 35] },
     { id: 'physical', name: 'Physical Interaction',              mix: [15, 75, 10] },
     { id: 'spatial',  name: 'Spatial Interaction',               mix: [40, 50, 10] },
     { id: 'dataviz',  name: 'Data Visualization',                mix: [5, 40, 55] },
-    { id: 'playful',  name: 'Playful Interaction',               mix: [40, 20, 40] },
-    { id: 'privacy',  name: 'Privacy + Security',                mix: [5, 25, 70] },
+    { id: 'playful',  name: 'Playful Interaction',               mix: [40, 20, 40], sym: true },
+    { id: 'privacy',  name: 'Privacy + Security',                mix: [5, 25, 70],  sym: true },
     { id: 'society',  name: 'Society, Ethics & Sustainability',  mix: [50, 0, 50] },
   ];
   CATS.forEach(c => { c.color = window.CHI_ICONS[c.id].fill; });

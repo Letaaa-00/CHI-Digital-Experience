@@ -33,9 +33,10 @@
     lock: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" fill="currentColor"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   };
 
+  // ico--sym marks the icons that look the same mirrored both ways (data.js); only those turn when an icon animates
   function icon(id, cls) {
     const i = ICONS[id];
-    return `<svg class="ico ${cls || ''}" viewBox="${i.vb}" fill="currentColor"${i.even ? ' fill-rule="evenodd"' : ''} aria-hidden="true">${i.body}</svg>`;
+    return `<svg class="ico${CAT[id] && CAT[id].sym ? ' ico--sym' : ''} ${cls || ''}" viewBox="${i.vb}" fill="currentColor"${i.even ? ' fill-rule="evenodd"' : ''} aria-hidden="true">${i.body}</svg>`;
   }
   function onColor(hex) {
     const c = [1, 3, 5].map(k => parseInt(hex.slice(k, k + 2), 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
@@ -251,7 +252,6 @@
         <p>${who}</p>
         <div>${S.user ? `<button class="btn btn--ghost btn--sm" data-act="logout">Log out</button>` : `<button class="btn btn--primary btn--sm" data-go="join">Join Conference</button>`}
         <button class="btn btn--text btn--sm" data-act="reset">Reset prototype</button></div>
-        <p class="lbl dim">${INFO.dates} · ${INFO.city}</p>
       </div>`;
     menuEl.hidden = false;
     requestAnimationFrame(() => menuEl.classList.add('is-on'));
@@ -402,14 +402,12 @@
         <h1 class="display">How are you<br>joining us?</h1>
         <button class="role" data-act="mode" data-mode="attendee" style="--c:var(--g)">
           <span class="lbl">Attendee</span>
-          <span class="role__glyph"><i class="sq"></i><i class="ci"></i></span>
           <b>I’m attending CHI.</b>
           <span class="role__line">Plan around sessions and meet people with shared interests.</span>
           <span class="role__go">${G.arrow}</span>
         </button>
         <button class="role" data-act="mode" data-mode="visitor" style="--c:var(--r)">
           <span class="lbl">Visitor</span>
-          <span class="role__glyph"><i class="ci"></i><i class="ci ci--o"></i></span>
           <b>I’m a visitor.</b>
           <span class="role__line">Explore talks, demos, meet-ups and receptions — all open to visitors.</span>
           <span class="role__go">${G.arrow}</span>
@@ -711,7 +709,8 @@
       Dashboard.paintSchedule();
       Dashboard.mountProfile();
       const stopTour = S.user && !S.seen.dash ? Tour.queue() : null;
-      return () => { Dashboard.unmountProfile && Dashboard.unmountProfile(); stopTour && stopTour(); };
+      // on the way out the badge turns back to its front, so that is the side shown on the next visit
+      return () => { Dashboard.unmountProfile && Dashboard.unmountProfile(); stopTour && stopTour(); UI.flipped = false; };
     },
     // the simple badge (front) and the creative badge (back); a click flips it
     badge() {
@@ -878,7 +877,7 @@
             </div>
             ${mine ? '' : `<button class="iconbtn tl__x" data-act="toggle" data-id="${e.id}" aria-label="Remove from my schedule">${G.close}</button>`}
           </li>`;
-        }).join('')}</ol>` : `<div class="empty"><div class="empty__px"><i></i><i></i><i></i></div><p>Nothing on ${DAYS[UI.dashDay].dow} yet.</p><button class="btn btn--ghost btn--sm" data-act="browse-day">Browse ${DAYS[UI.dashDay].dow}’s events</button></div>`}`;
+        }).join('')}</ol>` : `<div class="empty"><p>Nothing on ${DAYS[UI.dashDay].dow} yet.</p><button class="btn btn--ghost btn--sm" data-act="browse-day">Browse ${DAYS[UI.dashDay].dow}’s events</button></div>`}`;
       const first = $('.tl__item', el);
       if (first) $$('.tl__item', el).forEach(li => li.classList.add('rise'));
     },
@@ -903,13 +902,21 @@
     },
   };
 
-  /* ---------- 7. Home ---------- */
+  /* ---------- 7. Home ----------
+     What the first screen holds (styles.css, "Home"):
+     - phone, with a badge: the icon wall, the title, then when and where along the bottom edge;
+     - phone, guest: the wall, the title and the Join button at the very bottom;
+     - tablet and desktop: the wall, the title (and Join), then when, where and the countdown in one row.
+     On a phone the countdown row comes after the first screen, which is why it sits outside .first.
+     The wall is a picture, not a menu: its tiles are not links. */
   const Home = {
     html() {
       const days = Math.ceil((new Date(INFO.start) - Date.now()) / 864e5);
       return `${bar()}<section class="home">
+        <div class="home__top">
+        <div class="first${S.user ? '' : ' first--guest'}">
         <div class="hero">
-          <div class="wall" id="wall">${CATS.map((c, i) => `<button class="tile" style="--c:${c.color};--i:${i}" data-act="domain" data-cat="${c.id}" aria-label="${c.name} events">${icon(c.id)}</button>`).join('')}</div>
+          <div class="hero__wall"><div class="wall" id="wall" role="img" aria-label="The icons of the twelve CHI 2027 domains">${CATS.map((c, i) => `<span class="tile" style="--c:${c.color};--i:${i}">${icon(c.id)}</span>`).join('')}</div></div>
           <div class="hero__title">
             <p class="lbl">ACM CHI Conference on Human Factors in Computing Systems</p>
             <h1>CHI 2027<span>Bridges</span></h1>
@@ -922,10 +929,12 @@
         <div class="when">
           <div><p class="lbl">When</p><p class="when__big">May 10–14</p><p class="dim">Monday to Friday, 2027</p></div>
           <div><p class="lbl">Where</p><p class="when__big">Pittsburgh</p><p class="dim">${INFO.venue}</p></div>
-          <div class="when__row">
-            ${days > 0 ? `<p class="count"><b>${days}</b><span class="lbl">days<br>to go</span></p>` : `<p class="count"><b>Now</b><span class="lbl">on</span></p>`}
-            <button class="btn btn--ghost btn--sm" data-go="map">${G.pin} Open the map</button>
-          </div>
+        </div>
+        </div>
+        <div class="when__row">
+          ${days > 0 ? `<p class="count"><b>${days}</b><span class="lbl">days<br>to go</span></p>` : `<p class="count"><b>Now</b><span class="lbl">on</span></p>`}
+          <button class="btn btn--ghost btn--sm" data-go="map">${G.pin} Open the map</button>
+        </div>
         </div>
 
         ${secHead('About CHI 2027')}
@@ -1015,7 +1024,7 @@
       list.forEach(e => { const s = slots[slots.length - 1]; if (s && s.start === e.start) s.items.push(e); else slots.push({ start: e.start, items: [e] }); });
       $('#ev-list').innerHTML = (list.length
         ? slots.map((s, i) => `<div class="slot rise" style="--i:${i}"><p class="slot__t lbl">${s.start}</p><div class="slot__items">${s.items.map(e => evCard(e)).join('')}</div></div>`).join('')
-        : `<div class="empty"><div class="empty__px"><i></i><i></i><i></i></div><p>No matching events on ${DAYS[UI.evDay].dow}.</p>${counts.some(Boolean) ? `<button class="btn btn--ghost btn--sm" data-act="ev-next">Jump to the next one</button>` : `<button class="btn btn--ghost btn--sm" data-act="ev-clear">Clear filters</button>`}</div>`);
+        : `<div class="empty"><p>No matching events on ${DAYS[UI.evDay].dow}.</p>${counts.some(Boolean) ? `<button class="btn btn--ghost btn--sm" data-act="ev-next">Jump to the next one</button>` : `<button class="btn btn--ghost btn--sm" data-act="ev-clear">Clear filters</button>`}</div>`);
     },
   };
 
@@ -1053,26 +1062,51 @@
   };
 
   /* ---------- first-visit tour of the dashboard ----------
-     A few coach marks: the page dims, one part at a time is lit and explained in a card next to it.
-     While it runs the page underneath can't be used, scrolled or left; Skip (or Escape) ends it.
-     It shows once on this device, the first time someone with a badge opens their dashboard. */
+     A few coach marks. For each part of the page, in this order:
+       1. the page moves the part into view and a frame is drawn around all of it, while the rest dims;
+       2. a moment later (TOUR_HOLD) a small panel pops up and explains it.
+     On phones the panel sits along the bottom edge and the top bar steps aside, so the framed part has the
+     whole screen to itself first. Where the panel then covers the foot of a tall part, the frame stops above
+     it (after a whole item, for a list); and when the step is about something down there (the pencil at the
+     foot of the badge) the page moves up to show it. On wider screens the panel goes beside, below or above
+     the part. While the tour runs the page underneath can't be used, scrolled or left; Skip (or Escape) ends
+     it. It shows once on this device, the first time someone with a badge opens their dashboard. */
   const tourEl = document.getElementById('tour');
-  const TOUR_TOP = 84; // where a part is scrolled to: just under the top bar
+  const TOUR_TOP = 84;   // wider screens: where a part is scrolled to, just under the top bar
+  const TOUR_HOLD = 600; // ms a part is shown framed on its own before the panel pops up
   const lerp = (a, b, t) => a + (b - a) * t;
   const Tour = {
-    on: false, i: 0, list: [], raf: 0, wait: 0, cur: null, last: null, still: 0, placed: false, where: '', ch: 0,
+    on: false, i: 0, list: [], raf: 0, wait: 0, cur: null, last: null, still: 0, heldAt: 0, safe: 0, fw: 0, fh: 0, fixes: 0,
+    phase: 'frame', // 'frame': moving into view · 'held': framed, waiting · 'panel': the panel is up
+    where: '', ch: 0,
+    // focus: 'bottom' = the step is about the foot of the part · list = the part is a list (the frame may end after a whole item)
     steps() {
       const sec = id => () => { const body = $(id); return body ? [body.previousElementSibling, body] : []; };
+      const n = ['', 'one', 'two', 'three'][ALSO_EVENTS] || ALSO_EVENTS;
       return [
         { els: () => [$('#badge')], flip: false, twist: true, title: 'This is your badge',
-          text: `Your interest icons and your name. Save ${['', 'one', 'two', 'three'][ALSO_EVENTS] || ALSO_EVENTS} events from another area and its icon joins, up to ${['', 'one', 'two', 'three', 'four', 'five', 'six'][MAX_ICONS] || MAX_ICONS}. Tap the badge to turn it over.` },
-        { els: () => [$('#badge')], flip: true, hint: true, title: 'The other side is yours',
-          text: 'Your creative badge. Tap the pencil to rewrite your sentence and add images: your work, or anything that says who you are.' },
-        $('#dash-pres') && { els: sec('#dash-pres'), title: 'My Presentations',
+          text: `Your interest icons and your name. Save ${n} events from another area and its icon joins. Tap the badge to turn it over.` },
+        { els: () => [$('#badge')], flip: true, hint: true, focus: 'bottom', title: 'The other side is yours',
+          text: 'Your creative badge. Tap the pencil to rewrite your sentence and add images of your work or interests.' },
+        $('#dash-pres') && { els: sec('#dash-pres'), list: true, title: 'My Presentations',
           text: myPresentations().length ? 'Your slots, rooms and what to prepare for each.' : 'Presenting a paper, poster or demo? Link your registration email and your slots show up here.' },
-        { els: sec('#dash-sched'), title: 'My Schedule', text: 'Every event you save lands here, day by day.' },
-        { els: sec('#dash-recs'), title: 'Events that might interest you', text: 'Picked to match your interests. Tap + to save one.' },
+        { els: sec('#dash-sched'), list: true, title: 'My Schedule', text: 'Every event you save lands here, day by day.' },
+        { els: sec('#dash-recs'), list: true, title: 'Events that might interest you', text: 'Picked to match your interests. Tap + to save one.' },
       ].filter(Boolean);
+    },
+    // phones: the panel docks along an edge of the screen and the top bar is out of the way
+    narrow: f => f.width < 760,
+    top: f => (f.width < 760 ? 10 : TOUR_TOP - 12),
+    bot: f => f.height - 12 - Tour.safe,
+    scroll(dy) { app.scrollTo({ top: Math.max(0, app.scrollTop + dy), behavior: FX.reduced ? 'auto' : 'smooth' }); },
+    // How far the page has to scroll (down is positive) for a part to sit where its step wants it.
+    // Phones: at the very top, so as much of it as possible shows. Wider screens: just under the top bar,
+    // unless it is already in full view and either tall or in the upper part of the screen.
+    aim(r, f) {
+      const top = Tour.top(f);
+      if (Tour.narrow(f)) return r.y - top;
+      if (r.y >= top && r.y + r.h <= Tour.bot(f) && (r.h >= f.height * 0.5 || r.y + r.h <= f.height * 0.62)) return 0;
+      return r.y - TOUR_TOP;
     },
     // called when the dashboard opens; starts once the page has settled
     queue() {
@@ -1083,24 +1117,26 @@
     start() {
       if (Tour.on || !tourEl) return;
       Tour.on = true; Tour.list = Tour.steps(); Tour.cur = null;
-      app.inert = true;
+      app.inert = true; app.classList.add('is-touring');
       toastEl.classList.remove('is-on');
-      tourEl.innerHTML = '<div class="tour__hole"></div><div class="tour__card" role="dialog" aria-modal="true" aria-labelledby="tour-t" aria-describedby="tour-d"></div>';
+      tourEl.innerHTML = '<div class="tour__hole"></div><div class="tour__card" role="dialog" aria-modal="true" aria-labelledby="tour-t" aria-describedby="tour-d" inert></div>';
       tourEl.hidden = false;
+      Tour.safe = parseFloat(getComputedStyle(tourEl).paddingBottom) || 0; // room for the phone's home indicator
       requestAnimationFrame(() => tourEl.classList.add('is-on'));
       Tour.show(0);
       Tour.raf = requestAnimationFrame(Tour.tick);
     },
+    // begin a step: the panel goes away, and the part is brought into view to be framed on its own first
     show(i) {
       const st = Tour.list[i];
       if (!st) { Tour.end(); return; }
-      Tour.i = i; Tour.placed = false; Tour.still = performance.now(); Tour.last = null;
-      $('.tour__card', tourEl).classList.remove('is-on');
+      const f = tourEl.getBoundingClientRect(), card = $('.tour__card', tourEl);
+      Tour.i = i; Tour.phase = 'frame'; Tour.still = performance.now(); Tour.last = null; Tour.fw = f.width; Tour.fh = f.height; Tour.fixes = 0;
+      card.classList.remove('is-on'); card.inert = true; // out of sight and out of reach until it is set down again
       if (st.flip != null) Dashboard.flip(st.flip);
       const ed = $('.badge__edit'); ed && ed.classList.toggle('is-hint', !!st.hint);
-      // bring the part under the top bar, unless all of it is already comfortably in view
-      const f = tourEl.getBoundingClientRect(), r = Tour.rect(st, f);
-      if (r && !(r.y >= TOUR_TOP - 12 && r.y + r.h <= f.height * 0.62)) app.scrollTo({ top: Math.max(0, app.scrollTop + r.y - TOUR_TOP), behavior: FX.reduced ? 'auto' : 'smooth' });
+      const r = Tour.rect(st, f), dy = r ? Tour.aim(r, f) : 0;
+      if (Math.abs(dy) > 3) Tour.scroll(dy);
     },
     // the part's box inside the frame, with a little air around it
     rect(st, f) {
@@ -1108,50 +1144,79 @@
       if (!els.length) return null;
       let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
       els.forEach(el => { const b = el.getBoundingClientRect(); x0 = Math.min(x0, b.left); y0 = Math.min(y0, b.top); x1 = Math.max(x1, b.right); y1 = Math.max(y1, b.bottom); });
-      return { x: x0 - f.left - 8, y: y0 - f.top - 8, w: x1 - x0 + 16, h: y1 - y0 + 16 };
+      const pad = Tour.narrow(f) ? 6 : 8;
+      return { x: x0 - f.left - pad, y: y0 - f.top - pad, w: x1 - x0 + 2 * pad, h: y1 - y0 + 2 * pad };
     },
-    // what is lit: the part's box, kept inside the frame and clear of the card
-    clip(r, f) {
-      const top = TOUR_TOP - 12, bot = f.height - 14, s = Tour.placed ? Tour.where : '';
+    // What is framed: all of the part that is on screen. Once the panel is up, the frame also stays clear of it.
+    clip(st, r, f) {
+      const top = Tour.top(f), bot = Tour.bot(f);
       let y0 = Math.max(top, r.y), y1 = Math.min(bot, r.y + r.h);
-      if (s === 'dock' || s === 'below') y1 = Math.min(y1, bot - Tour.ch - 14);
-      if (s === 'dock-top' || s === 'above') y0 = Math.max(y0, top + Tour.ch + 14);
+      if (Tour.phase === 'panel') {
+        const s = Tour.where, lim = bot - Tour.ch - 12;
+        if ((s === 'dock' || s === 'below') && y1 > lim) y1 = st.list ? Tour.snap(st, f, y0, lim) : lim;
+        if (s === 'dock-top' || s === 'above') y0 = Math.max(y0, top + Tour.ch + 12);
+      }
       const x0 = Math.max(6, r.x), x1 = Math.min(f.width - 6, r.x + r.w);
       return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
     },
-    // write the card for this step and put it where it doesn't cover the part: along the bottom (or top) edge
-    // on phones; beside, below or above the part on wider screens
+    // A list cut short by the panel ends after its last whole item above `lim`, not through the middle of one,
+    // as long as that still shows a good part of the room. (A week laid out in columns has no such line: there
+    // the frame simply stops at `lim`.)
+    snap(st, f, y0, lim) {
+      let best = 0;
+      st.els().filter(Boolean).forEach(el => el.querySelectorAll(':scope > *, :scope > * > *').forEach(c => {
+        const b = c.getBoundingClientRect(), y = b.bottom - f.top + 8;
+        if (b.height > 20 && y <= lim && y > best) best = y;
+      }));
+      return best >= y0 + (lim - y0) * 0.55 ? best : lim;
+    },
+    // Write the panel for this step and set it down: along the bottom edge on phones (the top edge, if the part
+    // sits low and can't come up); beside, below or above the part on wider screens.
     place(st, r, f) {
       const card = $('.tour__card', tourEl), n = Tour.list.length, last = Tour.i === n - 1;
-      card.innerHTML = `<p class="lbl">${Tour.i + 1} / ${n}</p><h3 id="tour-t">${st.title}</h3><p id="tour-d">${st.text}</p>
+      card.innerHTML = `<h3 id="tour-t">${st.title}</h3><p class="lbl" aria-label="Step ${Tour.i + 1} of ${n}">${Tour.i + 1} / ${n}</p><p id="tour-d">${st.text}</p>
         <div class="tour__row">${last ? '' : '<button class="btn btn--text btn--sm" data-act="tour-skip">Skip</button>'}<button class="btn btn--primary btn--sm" data-act="tour-next">${last ? 'Done' : 'Next ' + G.arrow}</button></div>`;
-      const cw = card.offsetWidth, ch = card.offsetHeight, top = TOUR_TOP - 12, bot = f.height - 14;
-      const where = f.width < 760 ? (r.y >= top + ch + 20 ? 'dock-top' : 'dock')
+      const cw = card.offsetWidth, ch = card.offsetHeight, top = Tour.top(f), bot = Tour.bot(f);
+      const where = Tour.narrow(f) ? (r.y >= top + ch + 14 ? 'dock-top' : 'dock')
         : r.x + r.w + 16 + cw <= f.width - 12 ? 'right'
-        : bot - ch - 14 - Math.max(r.y, top) >= Math.min(r.h, 160) ? 'below' : 'above';
-      Tour.where = where; Tour.ch = ch; Tour.placed = true;
-      const t = Tour.clip(r, f), side = Math.max(12, Math.min(f.width - cw - 12, t.x));
+        : bot - ch - 12 - Math.max(r.y, top) >= Math.min(r.h, 160) ? 'below' : 'above';
+      Tour.where = where; Tour.ch = ch; Tour.phase = 'panel';
+      const t = Tour.clip(st, r, f), side = Math.max(12, Math.min(f.width - cw - 12, t.x));
       const [x, y] = where === 'dock' ? [12, bot - ch] : where === 'dock-top' ? [12, top]
         : where === 'right' ? [t.x + t.w + 16, Math.max(top, Math.min(bot - ch, t.y))]
-        : where === 'below' ? [side, t.y + t.h + 14] : [side, Math.max(top, t.y - 14 - ch)];
+        : where === 'below' ? [side, Math.min(bot - ch, t.y + t.h + 12)] : [side, Math.max(top, t.y - 12 - ch)];
       card.style.left = x + 'px'; card.style.top = y + 'px';
-      card.classList.add('is-on');
+      card.inert = false; card.classList.add('is-on');
       const next = $('[data-act="tour-next"]', card); next && next.focus({ preventScroll: true });
       if (st.twist) Dashboard.twist(true);
+      // The panel now covers the foot of a part taller than the room left above it. When that is what the step
+      // is about, the page moves up until the foot shows above the panel.
+      if (st.focus === 'bottom' && (where === 'dock' || where === 'below')) {
+        const over = r.y + r.h - (bot - ch - 12);
+        if (over > 1) Tour.scroll(over);
+      }
     },
-    // every frame: the lit box follows the part (through scrolling, resizing and the badge turning over),
-    // and the card is set down once the part has come to rest
+    // every frame: the frame follows the part (through scrolling and the badge turning over); once the part has
+    // come to rest it is held framed on its own for a moment, and then the panel is set down
     tick() {
       if (!Tour.on) return;
       const st = Tour.list[Tour.i], f = tourEl.getBoundingClientRect(), hole = $('.tour__hole', tourEl), r = Tour.rect(st, f);
       if (r && hole) {
+        // the screen changed size (a phone turned, a window resized): take this step again from the start
+        if (Math.abs(f.width - Tour.fw) + Math.abs(f.height - Tour.fh) > 1) { Tour.show(Tour.i); Tour.raf = requestAnimationFrame(Tour.tick); return; }
         const l = Tour.last, now = performance.now();
-        const moved = !l || Math.abs(r.x - l.x) + Math.abs(r.y - l.y) + Math.abs(r.w - l.w) + Math.abs(r.h - l.h) + Math.abs(f.width - l.fw) + Math.abs(f.height - l.fh) >= 0.5;
+        const moved = !l || Math.abs(r.x - l.x) + Math.abs(r.y - l.y) + Math.abs(r.w - l.w) + Math.abs(r.h - l.h) >= 0.5;
         if (moved) Tour.still = now; // when it last moved
-        Tour.last = { x: r.x, y: r.y, w: r.w, h: r.h, fw: f.width, fh: f.height, at: now };
-        if (moved && Tour.placed) { Tour.placed = false; $('.tour__card', tourEl).classList.remove('is-on'); }
-        if (!Tour.placed && now - Tour.still >= 110) Tour.place(st, r, f);
-        const t = Tour.clip(r, f), c = Tour.cur || { x: 0, y: 0, w: f.width, h: f.height };
+        Tour.last = { x: r.x, y: r.y, w: r.w, h: r.h, at: now };
+        if (Tour.phase === 'frame' && now - Tour.still >= 110) {
+          // at rest. If it settled a little off (the page was still arranging itself when the step began), nudge it once or twice more
+          const dy = Tour.aim(r, f), to = Math.max(0, Math.min(app.scrollHeight - app.clientHeight, app.scrollTop + dy));
+          if (Tour.fixes < 2 && Math.abs(to - app.scrollTop) > 3) { Tour.fixes++; Tour.scroll(dy); Tour.still = now; }
+          else { Tour.phase = 'held'; Tour.heldAt = now; }
+        }
+        else if (Tour.phase === 'held' && moved) Tour.phase = 'frame';
+        else if (Tour.phase === 'held' && now - Tour.heldAt >= (FX.reduced ? 0 : TOUR_HOLD)) Tour.place(st, r, f);
+        const t = Tour.clip(st, r, f), c = Tour.cur || { x: 0, y: 0, w: f.width, h: f.height };
         const k = FX.reduced ? 1 : 1 - Math.exp(-(l ? Math.min(64, now - l.at) : 16) / 70); // same glide at any frame rate
         const near = (a, b) => (Math.abs(a - b) < 0.4 ? b : lerp(a, b, k));
         Tour.cur = { x: near(c.x, t.x), y: near(c.y, t.y), w: near(c.w, t.w), h: near(c.h, t.h) };
@@ -1164,7 +1229,7 @@
       if (!Tour.on) return;
       Tour.on = false; cancelAnimationFrame(Tour.raf);
       S.seen.dash = true; save();
-      app.inert = false;
+      app.inert = false; app.classList.remove('is-touring');
       const ed = $('.badge__edit'); ed && ed.classList.remove('is-hint');
       Dashboard.flip(false);
       tourEl.classList.remove('is-on');

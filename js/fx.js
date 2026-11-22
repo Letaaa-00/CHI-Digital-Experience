@@ -150,7 +150,8 @@
             col = lerpC(ca, cb, e);
             if (t > 0 && t < 1) brandIdx = pickBrand(mixB, h2(k, seed + 99));
           }
-          // pointer play: cells near the finger break back into the three brand colours
+          // pointer play: where the pointer meets the icon, its cells break back into the three brand colours.
+          // The empty space around the icon does not react.
           let off = 0, near = 0;
           if (ptr) {
             const dx = x - ptr.x, dy = y - ptr.y, d = Math.hypot(dx, dy), R = cell * 5;
@@ -168,16 +169,9 @@
             if (v < 0.62 || near > 0.25) { ctx.beginPath(); ctx.arc(px, py, s / 2, 0, 6.2832); ctx.fill(); }
             else ctx.fillRect(px - s / 2, py - s / 2, s, s);
           } else {
-            // background lattice
-            if (near > 0.05) {
-              ctx.fillStyle = rgb(BR[pickBrand([1, 1, 1], h2(cx, cy))]);
-              ctx.globalAlpha = near;
-              ctx.beginPath(); ctx.arc(x, y, cell * 0.22, 0, 6.2832); ctx.fill();
-              ctx.globalAlpha = 1;
-            } else {
-              ctx.fillStyle = '#2b2b2b';
-              ctx.fillRect(x - 0.75, y - 0.75, 1.5, 1.5);
-            }
+            // background lattice: one faint dot per cell, the same whether or not the pointer is near
+            ctx.fillStyle = '#2b2b2b';
+            ctx.fillRect(x - 0.75, y - 0.75, 1.5, 1.5);
           }
         }
       }

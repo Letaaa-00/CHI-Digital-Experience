@@ -24,6 +24,9 @@
   --fs-3xl: 40px;  /* big numbers */
   --sans: 'Roboto', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
   --pad: 20px;
+  --bar-h: 60px;   /* height of the top bar (68px from 1100px) */
+  --first-min: 430px; /* Home: the least height its first screen may have (560px from 760px) */
+  --when-h: 146px;    /* Home, from 760px: height of the row with when, where and the countdown */
   --ease: cubic-bezier(.2, .8, .2, 1);
   --spring: cubic-bezier(.34, 1.56, .64, 1);
   --safe-b: env(safe-area-inset-bottom, 0px);
@@ -193,9 +196,6 @@ ul, ol { list-style: none; }
 .fchips__sep { flex: none; align-self: center; width: 1px; height: 24px; background: var(--line-2); }
 
 .empty { margin: 16px var(--pad); padding: 30px 20px; border: 1px dashed var(--line-2); display: grid; justify-items: center; gap: 14px; text-align: center; color: var(--text-2); }
-.empty__px { display: flex; gap: 4px; }
-.empty__px i { width: 10px; height: 10px; }
-.empty__px i:nth-child(1) { background: var(--g); } .empty__px i:nth-child(2) { background: var(--r); } .empty__px i:nth-child(3) { background: var(--b); }
 
 /* add-to-schedule */
 .add { position: relative; flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line-2); display: grid; place-items: center; color: #fff; background: var(--bg); transition: background .25s, border-color .25s, color .25s; }
@@ -300,14 +300,6 @@ ul, ol { list-style: none; }
 .role__line { font-size: var(--fs-md); line-height: 1.35; color: var(--text-2); max-width: 26ch; }
 .role__go { position: absolute; right: 16px; bottom: 16px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid currentColor; display: grid; place-items: center; transition: transform .3s var(--spring); }
 .role:hover .role__go { transform: translateX(4px); }
-.role__glyph { position: absolute; top: 16px; right: 18px; display: flex; }
-.role__glyph i { width: 34px; height: 34px; background: var(--c); transition: transform .5s var(--spring), background .3s; }
-.role__glyph .ci { border-radius: 50%; }
-.role__glyph .ci--o { background: none; box-shadow: inset 0 0 0 3px var(--c); margin-left: -10px; }
-.role:hover .role__glyph .sq { transform: rotate(90deg); }
-.role:hover .role__glyph .ci:last-child { transform: translateX(6px); }
-.role.is-picked .role__glyph i { background: #000; }
-.role.is-picked .role__glyph .ci--o { background: none; box-shadow: inset 0 0 0 3px #000; }
 .join__guest { margin: 4px var(--pad) 0; display: flex; justify-content: center; }
 .join__guest .btn--text { padding: 0 8px; }
 
@@ -470,19 +462,31 @@ ul, ol { list-style: none; }
 .g-dots svg { fill: var(--c); }
 .g-glitch { background: repeating-linear-gradient(104deg, var(--c) 0 9%, var(--c2) 9% 15%, #fff 15% 16.5%, var(--c2) 16.5% 22%, #000 22% 24%, var(--c) 24% 31%); }
 
-/* First-visit tour of the dashboard: the page dims except for one lit box, with a card explaining it.
-   The lit box is .tour__hole (its shadow is the dimming); app.js moves it and places the card. */
-.tour { position: absolute; inset: 0; z-index: 90; overflow: hidden; opacity: 0; transition: opacity .3s; touch-action: none; }
+/* First-visit tour of the dashboard: the page dims except for one framed part, and a panel explains it.
+   The frame is .tour__hole (its shadow is the dimming); app.js moves it, and sets the panel down a moment
+   after the frame has settled. The padding at the foot of .tour is the phone's home-indicator space, which
+   app.js reads to keep the panel above it. */
+.tour { position: absolute; inset: 0; z-index: 90; overflow: hidden; padding-bottom: var(--safe-b); opacity: 0; transition: opacity .3s; touch-action: none; }
 .tour.is-on { opacity: 1; }
-.tour__hole { position: absolute; left: 0; top: 0; box-shadow: 0 0 0 200vmax rgba(0, 0, 0, .8); outline: 1px solid rgba(255, 255, 255, .6); pointer-events: none; }
-.tour__card { position: absolute; left: 12px; top: 0; width: min(340px, calc(100% - 24px)); padding: 16px 18px 14px; background: #000; border: 1px solid var(--line-2); opacity: 0; translate: 0 8px; transition: opacity .2s, translate .35s var(--ease); }
-.tour__card.is-on { opacity: 1; translate: none; }
-.tour__card h3 { margin: 6px 0 8px; font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
+.tour__hole { position: absolute; left: 0; top: 0; box-shadow: 0 0 0 200vmax rgba(0, 0, 0, .8); outline: 2px solid #fff; pointer-events: none; }
+.tour__card { position: absolute; left: 12px; top: 0; width: min(340px, calc(100% - 24px)); padding: 16px 18px 14px; background: #000; border: 1px solid var(--line-2); opacity: 0; visibility: hidden; translate: 0 12px; transition: opacity .2s, translate .4s var(--spring), visibility 0s .2s; }
+.tour__card.is-on { opacity: 1; visibility: visible; translate: none; transition-delay: 0s; }
+.tour__card h3 { margin: 0 0 8px; padding-right: 52px; font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
+.tour__card > .lbl { position: absolute; top: 19px; right: 18px; color: var(--muted); }
 .tour__card > p:not(.lbl) { color: var(--text-2); line-height: 1.45; }
 .tour__row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
 .tour__row .btn--text { padding: 0 6px 0 0; text-decoration: underline; text-underline-offset: 3px; }
 .tour__row .btn--primary { margin-left: auto; }
-@media (max-width: 759px) { .tour__card { width: calc(100% - 24px); } }
+/* phones: a compact panel across the bottom, and the top bar out of the way so the framed part has the whole screen */
+@media (max-width: 759px) {
+  .tour__card { width: calc(100% - 24px); padding: 13px 16px 12px; translate: 0 20px; }
+  .tour__card h3 { font-size: var(--fs-lg); margin-bottom: 4px; }
+  .tour__card > .lbl { top: 15px; right: 16px; }
+  .tour__card > p:not(.lbl) { font-size: var(--fs-sm); line-height: 1.4; }
+  .tour__row { margin-top: 8px; }
+  .app > .bar { transition: opacity .25s; }
+  .app.is-touring > .bar { opacity: 0; visibility: hidden; transition: opacity .25s, visibility 0s .25s; }
+}
 /* during the tour the pencil on the creative side pulses, so the eye lands on it */
 .badge__edit.is-hint { border-color: #fff; animation: hint 1.4s ease-out infinite; }
 @keyframes hint { from { box-shadow: 0 0 0 0 rgba(255, 255, 255, .7); } to { box-shadow: 0 0 0 16px rgba(255, 255, 255, 0); } }
@@ -579,27 +583,63 @@ ul, ol { list-style: none; }
 /* ======================================================================
    Home
    ====================================================================== */
-.wall { display: grid; grid-template-columns: repeat(4, 1fr); }
-.tile { aspect-ratio: 1; display: grid; place-items: center; background: #141414; box-shadow: inset 0 0 0 .5px #000; color: var(--c); transition: background .5s var(--ease), color .3s; animation: rise .5s var(--ease) both; animation-delay: calc(var(--i) * 35ms); }
+/* The top of Home. What the first screen holds depends on who is looking, and on what:
+   - phone, with a badge: the icon wall, the title, then when and where along the bottom edge.
+     .first is exactly one screen tall (less the top bar). The countdown row comes after it.
+   - phone, guest: the wall, the title and the Join button at the very bottom. Here it is .hero that is
+     exactly one screen tall; when, where and the countdown come after it.
+   - tablet and desktop (further down this file): the wall, the title (and Join, for a guest), then one
+     row with when, where and the countdown, all within one screen.
+   The wall is the part that gives. With room to spare it grows a little and the rest of the room opens up
+   under the title; with too little it shrinks. Its tiles then stop being square, and once the wall is a wide
+   strip it regroups from 4 × 3 into 6 × 2, then 12 × 1, so the tiles stay close to square.
+   A first screen is never shorter than --first-min: on a very short screen it scrolls instead of squashing. */
+.first { display: flex; flex-direction: column; height: max(calc(100vh - var(--bar-h)), var(--first-min)); height: max(calc(100dvh - var(--bar-h)), var(--first-min)); }
+.hero { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.hero__wall { flex: 1 1 75vw; min-height: 96px; max-height: 100vw; container: wall / size; }
+.wall { height: 100%; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); }
+@container wall (min-aspect-ratio: 2 / 1) { .wall { grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(2, minmax(0, 1fr)); } }
+@container wall (min-aspect-ratio: 6 / 1) { .wall { grid-template-columns: repeat(12, 1fr); grid-template-rows: minmax(0, 1fr); } }
+.tile { min-width: 0; min-height: 0; display: grid; place-items: center; background: #141414; box-shadow: inset 0 0 0 .5px #000; color: var(--c); transition: background .5s var(--ease), color .3s; animation: rise .5s var(--ease) both; animation-delay: calc(var(--i) * 35ms); }
 .tile .ico { width: 54%; height: 54%; transition: transform .7s var(--spring); }
 .tile.is-inv { background: var(--c); color: #000; }
-.tile.is-inv .ico { transform: rotate(90deg); }
-.tile:active .ico { transform: scale(.8); }
-.hero__title { padding: 22px var(--pad) 26px; }
+/* a tile that changes colour turns its icon a quarter, but only an icon that reads the same turned (.ico--sym) */
+.tile.is-inv .ico--sym { transform: rotate(90deg); }
+.hero__title { flex: 1 0 auto; padding: 20px var(--pad) 52px; } /* the space under the title, before when and where, is at least 52px */
 .hero__title .lbl { max-width: 30ch; }
-.hero__title h1 { font-weight: 900; font-size: clamp(54px, 17vw, 76px); line-height: .88; letter-spacing: -.05em; margin-top: 12px; }
+.hero__title h1 { font-weight: 900; font-size: clamp(44px, min(17vw, 9.5vh), 76px); font-size: clamp(44px, min(17vw, 9.5dvh), 76px); line-height: .88; letter-spacing: -.05em; margin-top: 12px; }
 .hero__title h1 span { display: block; color: var(--bg); -webkit-text-stroke: 3px #fff; paint-order: stroke fill; }
-/* guests: a clear way in, right under the title */
-.home__join { margin-top: 28px; }
+/* guests: a clear way in */
+.home__join { margin-top: 24px; }
 .home__join .btn { width: 100%; }
-.when { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
-.when > div { padding: 18px var(--pad); }
+/* when and where: on a phone with a badge this is the bottom edge of the first screen */
+.when { flex: none; display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line-2); }
+.when > div { padding: 16px var(--pad) calc(16px + var(--safe-b)); }
 .when > div:nth-child(2) { border-left: 1px solid var(--line-2); }
 .when__big { font-size: var(--fs-2xl); font-weight: 900; letter-spacing: -.03em; line-height: 1.1; margin: 6px 0 4px; }
 .when .dim { font-size: var(--fs-sm); line-height: 1.35; }
-.when__row { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line-2); border-left: 0 !important; }
+/* the countdown and the way to the map: on a phone, the first thing after the first screen */
+.when__row { display: flex; align-items: center; justify-content: space-between; padding: 12px var(--pad); border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
 .count { display: flex; align-items: center; gap: 10px; }
 .count b { font-size: var(--fs-3xl); font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--g); }
+/* phone, guest: the wall, the title and Join fill the screen, with Join at the very bottom */
+@media (max-width: 759px) {
+  .first--guest { height: auto; }
+  .first--guest .hero { flex: none; height: max(calc(100vh - var(--bar-h)), var(--first-min)); height: max(calc(100dvh - var(--bar-h)), var(--first-min)); }
+  .first--guest .hero__title { display: flex; flex-direction: column; padding-bottom: calc(20px + var(--safe-b)); }
+  .first--guest .home__join { margin-top: auto; padding-top: 24px; }
+  .first--guest .when > div { padding-bottom: 16px; }
+}
+/* short phone screens: closer spacing, so the wall keeps a useful height */
+@media (max-width: 759px) and (max-height: 640px) {
+  .hero__title { padding: 14px var(--pad) 32px; }
+  .hero__title h1 { margin-top: 8px; }
+  .first--guest .hero__title { padding-bottom: calc(14px + var(--safe-b)); }
+  .first--guest .home__join { padding-top: 16px; }
+  .when > div { padding: 11px var(--pad) calc(11px + var(--safe-b)); }
+  .first--guest .when > div { padding-bottom: 11px; }
+  .when__big { margin: 3px 0 2px; }
+}
 .about-s { padding: 0 var(--pad); display: grid; gap: 16px; justify-items: start; color: var(--text-2); }
 .about-s b { color: #fff; }
 .pillars { display: grid; gap: 0; width: 100%; border-top: 1px solid var(--line); }
@@ -631,7 +671,8 @@ ul, ol { list-style: none; }
 .domain { display: flex; align-items: center; gap: 10px; padding: 12px; min-height: 60px; border: 1px solid var(--line-2); font-size: var(--fs-sm); font-weight: 500; line-height: 1.2; transition: background .25s, color .25s, border-color .25s; }
 .domain .ico { width: 26px; height: 26px; flex: none; color: var(--c); transition: color .25s, transform .5s var(--spring); }
 .domain:hover, .domain:active { background: var(--c); border-color: var(--c); color: #000; }
-.domain:hover .ico, .domain:active .ico { color: #000; transform: rotate(90deg); }
+.domain:hover .ico, .domain:active .ico { color: #000; }
+.domain:hover .ico--sym, .domain:active .ico--sym { transform: rotate(90deg); }
 .foot { margin-top: 56px; padding: 28px var(--pad) calc(36px + var(--safe-b)); border-top: 1px solid var(--line-2); display: grid; gap: 18px; justify-items: start; font-size: var(--fs-sm); color: var(--text-2); }
 
 /* ======================================================================
@@ -657,7 +698,7 @@ ul, ol { list-style: none; }
 .mixes { padding: 4px var(--pad) 0; border-top: 0; }
 .mixrow { display: grid; grid-template-columns: 34px 1fr; gap: 14px; align-items: center; width: 100%; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .mixrow .ico { width: 34px; height: 34px; color: var(--c); transition: transform .5s var(--spring); }
-.mixrow:hover .ico { transform: rotate(90deg); }
+.mixrow:hover .ico--sym { transform: rotate(90deg); }
 .mixrow b { display: block; font-size: var(--fs-sm); font-weight: 500; margin-bottom: 7px; }
 .mixrow .mix__bar { height: 8px; }
 
@@ -822,7 +863,7 @@ ul, ol { list-style: none; }
    ====================================================================== */
 @media (min-width: 760px) {
   :root { --fs-2xl: 32px; }
-  :root { --pad: 40px; }
+  :root { --pad: 40px; --first-min: 560px; }
   .display { font-size: clamp(56px, 6.4vw, 92px); }
   .lede { font-size: var(--fs-xl); }
   .sec-h { padding-top: 64px; padding-bottom: 22px; }
@@ -871,16 +912,20 @@ ul, ol { list-style: none; }
   .recs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); overflow: visible; }
   .rec { max-width: none; }
 
-  /* home */
-  .wall { grid-template-columns: repeat(6, 1fr); }
-  .hero__title { padding: 36px var(--pad) 44px; }
-  .hero__title h1 { font-size: clamp(76px, 11vw, 120px); }
+  /* home: one screen holds the wall (two rows of six to start with), the title, and a row with when, where
+     and the countdown. The wall and title together may be no taller than the screen less that row. */
+  .home__top { display: grid; grid-template-columns: 2fr 1fr; }
+  .first { display: contents; }
+  .hero { grid-column: 1 / -1; max-height: calc(max(100vh - var(--bar-h), var(--first-min)) - var(--when-h)); max-height: calc(max(100dvh - var(--bar-h), var(--first-min)) - var(--when-h)); }
+  .hero__wall { flex: 0 1 33.34vw; min-height: 110px; max-height: none; }
+  .hero__title { flex: none; padding: 32px var(--pad) 36px; }
+  .hero__title h1 { font-size: clamp(60px, min(11vw, 12vh), 120px); font-size: clamp(60px, min(11vw, 12dvh), 120px); }
   .home__join .btn { width: auto; min-width: 300px; }
-  .when { grid-template-columns: 1fr 1fr 1fr; }
-  .when > div { padding: 26px var(--pad); }
+  .when { grid-column: 1; grid-row: 2; min-height: var(--when-h); border-bottom: 1px solid var(--line-2); }
+  .when > div { padding: 22px var(--pad); }
   .when > div:nth-child(2) { padding-left: 32px; }
   .when__big { font-size: var(--fs-2xl); }
-  .when__row { grid-column: auto; border-top: 0; border-left: 1px solid var(--line-2) !important; flex-direction: column; align-items: flex-start; justify-content: center; gap: 14px; padding-left: 32px !important; }
+  .when__row { grid-column: 2; grid-row: 2; min-height: var(--when-h); flex-direction: column; align-items: flex-start; justify-content: center; gap: 14px; padding: 22px var(--pad) 22px 32px; border-left: 1px solid var(--line-2); }
   .about-s { max-width: 860px; }
   .progs { display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; border-top: 0; align-items: start; }
   .prog-row { border-bottom: 0; border-top: 1px solid var(--line-2); }
@@ -922,21 +967,16 @@ ul, ol { list-style: none; }
    Desktop  (≥1100px)
    ====================================================================== */
 @media (min-width: 1100px) {
-  :root { --pad: max(48px, calc((min(100vw, 1600px) - 1320px) / 2)); }
+  :root { --pad: max(48px, calc((min(100vw, 1600px) - 1320px) / 2)); --bar-h: 68px; }
   #frame { max-width: 1600px; box-shadow: 0 0 0 1px var(--line); }
 
-  .bar { height: 68px; }
+  .bar { height: var(--bar-h); }
   .bar__nav { display: flex; }
   .bar .burger { display: none; }
   .menu { display: none !important; }
 
-  /* home: type on the left, icon wall on the right */
-  .hero { display: grid; grid-template-columns: 5fr 7fr; border-bottom: 1px solid var(--line-2); }
-  .wall { order: 2; grid-template-columns: repeat(4, 1fr); border-left: 1px solid var(--line-2); }
-  .hero__title { order: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 48px 40px 56px var(--pad); }
-  .hero__title h1 { font-size: clamp(80px, 7.6vw, 122px); }
-  .when { border-top: 0; }
-  .when > div:nth-child(2), .when__row { padding-left: 40px !important; }
+  /* home: the side-by-side hero is in its own block below, shared with landscape tablets */
+  .when > div:nth-child(2), .when__row { padding-left: 40px; }
   .about-s { max-width: none; grid-template-columns: 5fr 7fr; column-gap: 72px; }
   .about-s > .lede { grid-column: 1; grid-row: 1 / span 3; font-size: var(--fs-2xl); line-height: 1.28; }
   .about-s > :not(.lede) { grid-column: 2; }
@@ -998,4 +1038,17 @@ ul, ol { list-style: none; }
   .pg > span { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
   .pg .ico { width: 24px; height: 24px; }
   .pd i { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
+}
+
+/* Home on desktop, and on tablets held sideways: type on the left, icon wall on the right.
+   The hero is as tall as a wall of square tiles wants (three rows, each a quarter of the wall's width),
+   and shorter when the screen is (what is left of it above the when-where-countdown row), down to 300px. */
+@media (min-width: 1100px), (min-width: 760px) and (min-aspect-ratio: 5 / 4) {
+  .hero { display: grid; grid-template-columns: 5fr 7fr; grid-template-rows: minmax(0, 1fr); max-height: none; border-bottom: 1px solid var(--line-2);
+    height: clamp(300px, calc(100vh - var(--bar-h) - var(--when-h)), calc(min(100vw, 1600px) * .4375));
+    height: clamp(300px, calc(100dvh - var(--bar-h) - var(--when-h)), calc(min(100vw, 1600px) * .4375)); }
+  .hero__wall { order: 2; min-height: 0; border-left: 1px solid var(--line-2); }
+  .hero__title { order: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 28px 40px 40px var(--pad); }
+  .hero__title h1 { font-size: clamp(56px, min(7.6vw, 13vh), 122px); font-size: clamp(56px, min(7.6vw, 13dvh), 122px); }
+  .when, .when__row { border-top: 0; }
 }
