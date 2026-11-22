@@ -16,7 +16,7 @@
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; /* private mode or storage full — keep in memory */ } };
 
   const newSetup = () => ({ step: 0, name: '', email: '', role: null, mix: [1 / 3, 1 / 3, 1 / 3], topics: [] });
-  const UI = { evDay: 0, evCat: null, evType: null, dashDay: 0, flipped: false, setup: newSetup() };
+  const UI = { evDay: 0, evCats: [], evType: null, dashDay: 0, flipped: false, setup: newSetup() };
 
   /* ---------- small pieces ---------- */
   const G = {
@@ -24,6 +24,7 @@
     back: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H5M11 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
     plus: '<svg class="g g-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>',
     check: '<svg class="g g-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6"/></svg>',
+    chev: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     qr: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14 14h2v2h-2zM18 14h2v2h-2zM16 16h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" fill="currentColor"/></svg>',
     close: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
     pin: '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.800 12 21 12 21z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9.500" r="2.200" fill="currentColor"/></svg>',
@@ -766,7 +767,7 @@
         }).join('')}</div>`;
         return;
       }
-      el.innerHTML = `<div class="days" role="tablist">${DAYS.map((d, i) => `<button class="day ${i === UI.dashDay ? 'is-on' : ''}" data-act="dash-day" data-day="${i}" role="tab" aria-selected="${i === UI.dashDay}"><span class="lbl">${d.dow}</span><b>${d.d}</b>${counts[i] ? `<i>${counts[i]}</i>` : ''}</button>`).join('')}</div>
+      el.innerHTML = `<div class="days" role="tablist">${DAYS.map((d, i) => `<button class="day ${i === UI.dashDay ? 'is-on' : ''}" data-act="dash-day" data-day="${i}" role="tab" aria-selected="${i === UI.dashDay}"><span class="lbl">${d.dow}</span><b>${d.d}</b>${counts[i] ? '<i aria-hidden="true"></i>' : ''}</button>`).join('')}</div>
         ${today.length ? `<ol class="tl">${today.map((e, i) => {
           const mine = presentingAt(e.id);
           const clash = today.find(o => o !== e && mins(o.start) < mins(e.end) && mins(e.start) < mins(o.end));
@@ -876,33 +877,47 @@
   /* ---------- 8. Events ---------- */
   const Events = {
     html() {
+      // arriving from the menu (or any plain link) starts unfiltered; Home's domain / type / day shortcuts set UI.evKeep first
+      if (!UI.evKeep) { UI.evCats = []; UI.evType = null; }
+      UI.evKeep = false;
       return `${bar()}<section class="events">
         <div class="events__head">
           <h1 class="display">Events</h1>
           <div class="days days--sticky" id="ev-days"></div>
-          <div class="fchips" id="ev-cats">
-            <button class="fchip" data-act="ev-cat" data-cat="">All domains</button>
-            ${CATS.map(c => `<button class="fchip" style="--c:${c.color}" data-act="ev-cat" data-cat="${c.id}">${icon(c.id)}${c.name}</button>`).join('')}
+          <div class="fchips" id="ev-cats" role="toolbar" aria-label="Filter events">
+            <button class="fchip fchip--select" id="ev-type-pill" data-act="ev-type-open" aria-haspopup="dialog"><span id="ev-type-t">All types</span>${G.chev}</button>
+            <i class="fchips__sep" aria-hidden="true"></i>
+            ${Events.chipOrder().map(c => `<button class="fchip" style="--c:${c.color}" data-act="ev-cat" data-cat="${c.id}" aria-pressed="false">${icon(c.id)}${c.name}</button>`).join('')}
           </div>
         </div>
         <div id="ev-list"></div>
         ${footer()}
       </section>`;
     },
+    // domain chip order: a domain chosen on the way in, then the person's primary and secondary interest, then the rest
+    chipOrder() {
+      const first = UI.evCats.concat(S.user ? [S.user.primary, S.user.secondary] : []);
+      const ids = [...new Set(first.concat(CATS.map(c => c.id)))];
+      return ids.map(id => CAT[id]).filter(Boolean);
+    },
     mount() {
       Events.paint();
-      const on = $('#ev-cats .is-on'); on && on.scrollIntoView({ inline: 'center', block: 'nearest' });
+      // a domain chosen on the way in is rendered first, right after the type pill
+      $('#ev-cats').scrollLeft = 0;
     },
     paint() {
-      const all = EVENTS.filter(e => (!UI.evCat || e.cat === UI.evCat) && (!UI.evType || e.type === UI.evType));
+      const all = EVENTS.filter(evMatch);
       const counts = DAYS.map((_, d) => all.filter(e => e.day === d).length);
-      $('#ev-days').innerHTML = DAYS.map((d, i) => `<button class="day ${i === UI.evDay ? 'is-on' : ''} ${counts[i] ? '' : 'is-empty'}" data-act="ev-day" data-day="${i}" role="tab" aria-selected="${i === UI.evDay}"><span class="lbl">${d.dow}</span><b>${d.d}</b>${(UI.evCat || UI.evType) && counts[i] ? `<i>${counts[i]}</i>` : ''}</button>`).join('');
-      $$('#ev-cats .fchip').forEach(b => b.classList.toggle('is-on', (b.dataset.cat || null) === UI.evCat));
+      $('#ev-days').innerHTML = DAYS.map((d, i) => `<button class="day ${i === UI.evDay ? 'is-on' : ''} ${counts[i] ? '' : 'is-empty'}" data-act="ev-day" data-day="${i}" role="tab" aria-selected="${i === UI.evDay}"><span class="lbl">${d.dow}</span><b>${d.d}</b>${(UI.evCats.length || UI.evType) && counts[i] ? '<i aria-hidden="true"></i>' : ''}</button>`).join('');
+      // filters: the type pill shows the chosen type; domain chips are on or off
+      $('#ev-type-t').textContent = UI.evType ? PROGRAMS.find(p => p.type === UI.evType).name : 'All types';
+      $('#ev-type-pill').classList.toggle('is-on', !!UI.evType);
+      $('#ev-type-pill').setAttribute('aria-label', `Activity type: ${$('#ev-type-t').textContent}. Change`);
+      $$('#ev-cats .fchip[data-cat]').forEach(b => { const on = UI.evCats.includes(b.dataset.cat); b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on); });
       const list = all.filter(e => e.day === UI.evDay).sort(sortEv);
       const slots = [];
       list.forEach(e => { const s = slots[slots.length - 1]; if (s && s.start === e.start) s.items.push(e); else slots.push({ start: e.start, items: [e] }); });
-      const filt = UI.evType ? `<button class="fchip is-on fchip--x" data-act="ev-type-clear">${TYPES[UI.evType]} ${G.close}</button>` : '';
-      $('#ev-list').innerHTML = `<p class="events__sum lbl"><span>${dayLabel(UI.evDay)} · ${list.length} event${list.length === 1 ? '' : 's'}</span>${filt}</p>` + (list.length
+      $('#ev-list').innerHTML = (list.length
         ? slots.map((s, i) => `<div class="slot rise" style="--i:${i}"><p class="slot__t lbl">${s.start}</p><div class="slot__items">${s.items.map(e => evCard(e)).join('')}</div></div>`).join('')
         : `<div class="empty"><div class="empty__px"><i></i><i></i><i></i></div><p>No matching events on ${DAYS[UI.evDay].dow}.</p>${counts.some(Boolean) ? `<button class="btn btn--ghost btn--sm" data-act="ev-next">Jump to the next one</button>` : `<button class="btn btn--ghost btn--sm" data-act="ev-clear">Clear filters</button>`}</div>`);
     },
@@ -1094,7 +1109,7 @@
       go('setup');
     },
     logout() { S.user = null; S.mode = null; save(); go(''); toast('Logged out'); },
-    reset() { S = blank(); save(); UI.setup = newSetup(); UI.evCat = UI.evType = null; UI.evDay = UI.dashDay = 0; go(''); toast('Prototype reset'); },
+    reset() { S = blank(); save(); UI.setup = newSetup(); UI.evCats = []; UI.evType = null; UI.evDay = UI.dashDay = 0; go(''); toast('Prototype reset'); },
     'cb-edit'() { Dashboard.openEditor(); },
     'cb-add'() { const f = $('#cb-file'); f && f.click(); },
     'cb-rm'(el) { creativeOf(S.user).images.splice(+el.dataset.i, 1); save(); Dashboard.paintEditor(); },
@@ -1115,23 +1130,42 @@
     },
     event(el) { eventSheet(el.dataset.id); },
     'dash-day'(el) { UI.dashDay = +el.dataset.day; Dashboard.paintSchedule(); },
-    'browse-day'(el) { UI.evDay = el.dataset.day != null ? +el.dataset.day : UI.dashDay; UI.evCat = UI.evType = null; go('events'); },
+    'browse-day'(el) { UI.evKeep = true; UI.evDay = el.dataset.day != null ? +el.dataset.day : UI.dashDay; UI.evCats = []; UI.evType = null; go('events'); },
     'ev-day'(el) { UI.evDay = +el.dataset.day; Events.paint(); },
     'ev-cat'(el) {
-      UI.evCat = el.dataset.cat || null;
+      // tap to add a domain, tap again to take it away; any number can be on at once
+      const c = el.dataset.cat;
+      UI.evCats = UI.evCats.includes(c) ? UI.evCats.filter(x => x !== c) : UI.evCats.concat(c);
       Events.jumpIfEmpty(); Events.paint();
-      el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
     },
-    'ev-type-clear'() { UI.evType = null; Events.paint(); },
-    'ev-clear'() { UI.evType = UI.evCat = null; Events.paint(); },
+    // the activity-type picker: a sheet in the site's own style, with rows big enough for a thumb
+    'ev-type-open'() {
+      const n = type => EVENTS.filter(e => (!type || e.type === type) && (!UI.evCats.length || UI.evCats.includes(e.cat))).length;
+      const row = (type, name) => {
+        const on = (UI.evType || '') === type;
+        return `<li><button class="tpick__row${on ? ' is-on' : ''}${n(type) ? '' : ' is-zero'}" data-act="ev-type-pick" data-type="${type}" role="option" aria-selected="${on}">
+          <span class="tpick__t"><b>${name}</b></span></button></li>`;
+      };
+      openSheet(`<div class="tpick"><p class="lbl">Activity type${UI.evCats.length ? ` · in ${UI.evCats.length} domain${UI.evCats.length > 1 ? 's' : ''}` : ''}</p>
+        <ul role="listbox" aria-label="Activity type">${row('', 'All types')}${PROGRAMS.map(p => row(p.type, p.name)).join('')}</ul></div>`);
+    },
+    'ev-type-pick'(el) {
+      UI.evType = el.dataset.type || null;
+      closeSheet(); Events.jumpIfEmpty(); Events.paint();
+      $('#ev-type-pill').focus({ preventScroll: true });
+    },
+    'ev-clear-cats'() { UI.evCats = []; Events.paint(); },
+    'ev-clear'() { UI.evType = null; UI.evCats = []; Events.paint(); },
     'ev-next'() { Events.jumpIfEmpty(true); Events.paint(); },
-    domain(el) { UI.evCat = el.dataset.cat; UI.evType = null; Events.jumpIfEmpty(); go('events'); },
-    type(el) { UI.evType = el.dataset.type; UI.evCat = null; Events.jumpIfEmpty(); go('events'); },
+    // from Home or About: a domain arrives on its own with every type; a type arrives with every domain
+    domain(el) { UI.evKeep = true; UI.evCats = [el.dataset.cat]; UI.evType = null; Events.jumpIfEmpty(); go('events'); },
+    type(el) { UI.evKeep = true; UI.evType = el.dataset.type; UI.evCats = []; Events.jumpIfEmpty(); go('events'); },
   };
+  // an event passes when it's of the chosen type (or any) and in one of the chosen domains (or any)
+  function evMatch(e) { return (!UI.evType || e.type === UI.evType) && (!UI.evCats.length || UI.evCats.includes(e.cat)); }
   Events.jumpIfEmpty = function () {
-    const match = e => (!UI.evCat || e.cat === UI.evCat) && (!UI.evType || e.type === UI.evType);
-    if (EVENTS.some(e => match(e) && e.day === UI.evDay)) return;
-    for (let k = 1; k <= 5; k++) { const d = (UI.evDay + k) % 5; if (EVENTS.some(e => match(e) && e.day === d)) { UI.evDay = d; return; } }
+    if (EVENTS.some(e => evMatch(e) && e.day === UI.evDay)) return;
+    for (let k = 1; k <= 5; k++) { const d = (UI.evDay + k) % 5; if (EVENTS.some(e => evMatch(e) && e.day === d)) { UI.evDay = d; return; } }
   };
 
   document.addEventListener('click', e => {
