@@ -361,10 +361,10 @@ ul, ol { list-style: none; }
    ====================================================================== */
 .reveal { min-height: 100%; display: flex; flex-direction: column; background: radial-gradient(120% 60% at 50% 34%, color-mix(in srgb, var(--c, #fff) 13%, transparent), transparent 70%); }
 .reveal > .lede { padding: 80px var(--pad) 20px; }
-/* phones: the icon gives way so the result and the next-step button fit on one screen */
-.reveal__stage { position: relative; display: block; width: clamp(112px, calc(100dvh - 440px), min(68vw, 290px)); aspect-ratio: 1; margin: 8px auto 20px; flex: none; }
+/* phones: the icon takes only the height left over, so the result (even a two-line name) and the next-step button fit on one screen */
+.reveal__stage { position: relative; display: block; flex: 1 1 0; min-height: 112px; width: 100%; margin: 8px 0 20px; container-type: size; }
 .reveal__retake { margin-right: -12px; }
-.reveal__stage canvas, .reveal__svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.reveal__stage canvas, .reveal__svg { position: absolute; inset: 0; margin: auto; width: min(68vw, 290px, 100cqh); height: min(68vw, 290px, 100cqh); }
 .reveal__svg { color: var(--c); opacity: 0; transform: scale(.985); transition: opacity .3s, transform .6s var(--spring); }
 .reveal__stage canvas { transition: opacity .35s .1s; }
 .is-done .reveal__svg { opacity: 1; transform: none; }
@@ -376,14 +376,16 @@ ul, ol { list-style: none; }
 .is-done .reveal__mix { transition-delay: 1.35s; } .is-done .reveal__foot { transition-delay: 1.6s; }
 .reveal__main { padding: 0 var(--pad); text-align: center; }
 .reveal__main h1 { font-size: clamp(32px, 9.6vw, 42px); font-weight: 900; line-height: 1; letter-spacing: -.035em; margin-top: 6px; color: var(--c); text-wrap: balance; }
-.reveal__second { display: flex; align-items: center; gap: 14px; margin: 20px var(--pad) 0; padding: 12px 14px; border: 1px solid var(--line-2); }
+.reveal__second { display: flex; align-items: center; gap: 14px; min-width: 0; margin: 20px var(--pad) 0; padding: 12px 14px; border: 1px solid var(--line-2); }
 .reveal__ico2 { width: 46px; height: 46px; flex: none; color: var(--c2); }
 @keyframes pxwipe { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
-.is-done .reveal__ico2 { animation: pxwipe .6s steps(6) 1.05s both; }
+/* 'backwards', not 'both': once the wipe ends the icon drops the clip entirely (iOS Safari otherwise left it stuck on the last step, cutting off the bottom) */
+.is-done .reveal__ico2 { animation: pxwipe .6s steps(6) 1.05s backwards; }
 /* opened from the dashboard rather than straight after the questions: no reveal, the result is simply there */
 .reveal.is-still .reveal__svg, .reveal.is-still .reveal__stage canvas, .reveal.is-still .reveal__main, .reveal.is-still .reveal__second, .reveal.is-still .reveal__mix, .reveal.is-still .reveal__foot { transition: none; }
 .reveal.is-still .reveal__ico2 { animation: none; }
-.reveal__second h2 { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
+.reveal__second > div { min-width: 0; }
+.reveal__second h2 { overflow-wrap: anywhere; font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
 .reveal__mix { padding: 18px var(--pad) 0; }
 .reveal__foot { margin-top: auto; padding: 22px var(--pad) calc(14px + var(--safe-b)); display: grid; gap: 4px; }
 
@@ -899,7 +901,8 @@ ul, ol { list-style: none; }
   .login__foot { margin-top: 44px; grid-template-columns: 1fr 1fr; }
 
   /* reveal */
-  .reveal__stage { width: min(48vw, 400px, 42vh); }
+  .reveal__stage { flex: none; min-height: 0; aspect-ratio: 1; width: min(48vw, 400px, 42vh); margin-inline: auto; }
+  .reveal__stage canvas, .reveal__svg { width: 100%; height: 100%; }
   .reveal__second, .reveal__mix, .reveal__foot { width: 100%; max-width: 600px; margin-inline: auto; }
   .reveal__second { margin-top: 24px; }
   .reveal__foot { margin-top: 32px; }
