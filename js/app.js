@@ -45,11 +45,11 @@
   const floorOf = roomId => FLOORS[ROOM[roomId].floorIndex];
   const whereLabel = roomId => `${ROOM[roomId].name} · ${floorOf(roomId).name}`;
 
-  function mixBar(mix, legend) {
+  function mixBar(mix, legend, noPct) {
     const s = mix[0] + mix[1] + mix[2] || 1;
     const p = mix.map(v => Math.round(v / s * 100));
     return `<div class="mix"><div class="mix__bar">${['g', 'r', 'b'].map((k, i) => (mix[i] / s < 0.004 ? '' : `<span style="flex:${mix[i] / s};background:var(--${k})"></span>`)).join('')}</div>${
-      legend ? `<ul class="mix__legend">${PILLARS.map((pl, i) => `<li><i style="background:${pl.color}"></i>${pl.name}<b>${p[i]}%</b></li>`).join('')}</ul>` : ''}</div>`;
+      legend ? `<ul class="mix__legend">${PILLARS.map((pl, i) => `<li><i style="background:${pl.color}"></i>${pl.name}${noPct ? '' : `<b>${p[i]}%</b>`}</li>`).join('')}</ul>` : ''}</div>`;
   }
 
   const logo = href => `<a class="logo" href="${href}" aria-label="CHI 2027"><b>CHI</b><span>27</span><i><s></s><s></s><s></s></i></a>`;
@@ -59,7 +59,7 @@
     // desktop shows the menu inline; phones and tablets get the hamburger
     const nav = `<nav class="bar__nav" aria-label="Main">${NAV.map(([r, name]) => `<a href="#/${r}"${cur === r ? ' class="is-cur" aria-current="page"' : ''}>${name}${r === 'dashboard' ? `<em data-sched-count${n ? '' : ' hidden'}>${n}</em>` : ''}</a>`).join('')}${S.user ? '' : `<button class="btn btn--primary btn--sm" data-go="join">Join</button>`}</nav>`;
     return `<header class="bar ${opts.cls || ''}">
-      ${opts.back != null ? `<button class="iconbtn" data-act="back" data-to="${opts.back}" aria-label="Back">${G.back}</button>` : logo(opts.onboarding ? '#/' : '#/home')}
+      ${opts.back != null ? `<button class="iconbtn" data-act="back" data-to="${opts.back}" aria-label="Back">${G.back}</button>` : opts.noLogo ? '<span></span>' : logo(opts.onboarding ? '#/' : '#/home')}
       ${opts.right != null ? opts.right : nav + `<button class="burger" data-act="menu" aria-label="Open menu" aria-haspopup="dialog"><i></i><i></i></button>`}
     </header>`;
   }
@@ -304,7 +304,7 @@
     html() {
       const u = S.user;
       return `<section class="landing">
-        ${bar({ onboarding: true, right: '<span class="lbl dim">ACM SIGCHI</span>', cls: 'bar--clear' })}
+        ${bar({ onboarding: true, noLogo: true, right: '<span class="lbl dim">ACM SIGCHI</span>', cls: 'bar--clear' })}
         <div class="landing__title">
           <p class="lbl">Conference on Human Factors<br>in Computing Systems</p>
           <h1>CHI<br>2027</h1>
@@ -328,7 +328,7 @@
     mount() {
       const ids = CATS.map(c => c.id).sort(() => Math.random() - 0.5);
       const f = FX.field($('#pix'), {
-        ids, cy: () => (split.matches ? 0.5 : 0.6),
+        ids, cy: () => 0.5, padBottom: () => (split.matches ? 0 : 44),
         onChange(id) {
           const n = $('#pixname'), d = $('#pixdot');
           if (!n) return;
@@ -504,8 +504,7 @@
       if (!u) return `<section class="reveal"><p class="lede">No badge yet.</p><button class="btn btn--primary" data-go="join">Join Conference</button></section>`;
       const p = CAT[u.primary], s = CAT[u.secondary];
       return `<section class="reveal" id="reveal" style="--c:${p.color};--c2:${s.color}">
-        ${bar({ onboarding: true, right: '<span class="lbl dim">Your icon</span>', cls: 'bar--clear' })}
-        <p class="lbl reveal__kicker" id="rvk">Reading your answers…</p>
+        ${bar({ onboarding: true, right: '<button class="btn btn--text btn--sm reveal__retake" data-act="retake"><u>Retake</u></button>', cls: 'bar--clear' })}
         <button class="reveal__stage" data-act="replay" aria-label="Replay the reveal">
           <canvas id="rv" aria-hidden="true"></canvas>
           <span class="reveal__svg">${icon(u.primary)}</span>
@@ -518,10 +517,9 @@
           <span class="reveal__ico2">${icon(u.secondary)}</span>
           <div><p class="lbl">With a streak of</p><h2>${s.name}</h2></div>
         </div>
-        <div class="reveal__mix">${mixBar(u.mix, true)}</div>
+        <div class="reveal__mix">${mixBar(u.mix, true, true)}</div>
         <div class="reveal__foot">
           <button class="btn btn--primary" data-go="dashboard">Go to my dashboard ${G.arrow}</button>
-          <button class="btn btn--text" data-act="retake">Not quite you? <u>Retake</u></button>
         </div>
       </section>`;
     },
@@ -531,11 +529,10 @@
       const run = () => {
         const root = $('#reveal'); if (!root) return;
         root.classList.remove('is-done');
-        $('#rvk').textContent = 'Reading your answers…';
         fx && fx.destroy();
         fx = FX.reveal($('#rv'), {
           id: S.user.primary, mix: S.user.mix,
-          onDone() { root.classList.add('is-done'); $('#rvk').textContent = `${S.user.name.split(' ')[0]}, this is you at CHI`; },
+          onDone() { root.classList.add('is-done'); },
         });
       };
       Reveal.replay = run;

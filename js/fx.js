@@ -126,7 +126,9 @@
       const ox = (w - COLS * cell) / 2;
       const ix0 = Math.round((COLS - N) / 2);
       const cyf = typeof opts.cy === 'function' ? opts.cy() : (opts.cy || 0.5);
-      const iy0 = Math.max(0, Math.round(rows * cyf - N / 2));
+      // keep the icon clear of anything pinned to the bottom of the stage (the landing's domain label)
+      const pb = typeof opts.padBottom === 'function' ? opts.padBottom() : (opts.padBottom || 0);
+      const iy0 = Math.max(0, Math.min(Math.round(rows * cyf - N / 2), Math.floor((h - pb) / cell) - N));
       const ga = FX.grid(prev, N), gb = FX.grid(cur, N);
       const ca = hex(CAT[prev].color), cb = hex(CAT[cur].color);
       const mixB = CAT[cur].mix;
