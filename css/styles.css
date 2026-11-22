@@ -216,9 +216,10 @@ ul, ol { list-style: none; }
 /* ---------- sheet ---------- */
 .sheet { position: absolute; inset: 0; z-index: 50; }
 .sheet__scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .66); opacity: 0; transition: opacity .3s; }
-.sheet__panel { position: absolute; left: 0; right: 0; bottom: 0; max-height: 88%; overflow-y: auto; overscroll-behavior: contain; background: #161616; border-top: 1px solid var(--line-2); padding: 26px var(--pad) calc(26px + var(--safe-b)); transform: translateY(102%); transition: transform .42s var(--ease); }
-/* the grip sticks to the top edge while the sheet's content scrolls under it */
-.sheet__grip { position: sticky; top: -26px; z-index: 3; display: block; height: 40px; margin: -26px calc(-1 * var(--pad)) -14px; background: linear-gradient(#161616 26px, rgba(22, 22, 22, 0)); touch-action: none; cursor: grab; }
+.sheet__panel { position: absolute; left: 0; right: 0; bottom: 0; max-height: 88%; display: flex; flex-direction: column; overflow: hidden; background: #161616; border-top: 1px solid var(--line-2); transform: translateY(102%); transition: transform .42s var(--ease); }
+/* only the body scrolls, so the grip and close button never move (and iOS bounce stays inside the body) */
+.sheet__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 0 var(--pad) calc(26px + var(--safe-b)); }
+.sheet__grip { position: relative; flex: none; height: 32px; touch-action: none; cursor: grab; }
 .sheet__grip::before { content: ''; position: absolute; top: 9px; left: 50%; width: 40px; height: 4px; margin-left: -20px; border-radius: 2px; background: #666; }
 .sheet__grip:active { cursor: grabbing; }
 .sheet.is-on .sheet__scrim { opacity: 1; }
@@ -789,7 +790,8 @@ ul, ol { list-style: none; }
   .toast { left: 50%; right: auto; width: max-content; max-width: min(480px, 90%); transform: translate(-50%, 16px); }
   .toast.is-on { transform: translate(-50%, 0); }
   /* the event sheet becomes a side drawer */
-  .sheet__panel { left: auto; top: 0; width: 480px; max-height: none; border-top: 0; border-left: 1px solid var(--line-2); padding: 72px 32px 32px; transform: translateX(102%); }
+  .sheet__panel { left: auto; top: 0; width: 480px; max-height: none; border-top: 0; border-left: 1px solid var(--line-2); transform: translateX(102%); }
+  .sheet__body { padding: 72px 32px 32px; }
   .sheet__grip { display: none; }
   .sheet__x { top: 18px; right: 22px; }
 

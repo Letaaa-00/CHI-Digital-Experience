@@ -135,7 +135,7 @@
   let sheetReturn = null;
   function openSheet(html) {
     sheetReturn = document.activeElement;
-    sheetEl.innerHTML = `<div class="sheet__scrim" data-act="close-sheet"></div><div class="sheet__panel" role="dialog" aria-modal="true"><div class="sheet__grip" aria-hidden="true"></div><button class="iconbtn sheet__x" data-act="close-sheet" aria-label="Close">${G.close}</button>${html}</div>`;
+    sheetEl.innerHTML = `<div class="sheet__scrim" data-act="close-sheet"></div><div class="sheet__panel" role="dialog" aria-modal="true"><div class="sheet__grip" aria-hidden="true"></div><button class="iconbtn sheet__x" data-act="close-sheet" aria-label="Close">${G.close}</button><div class="sheet__body">${html}</div></div>`;
     sheetEl.hidden = false;
     requestAnimationFrame(() => sheetEl.classList.add('is-on'));
     const x = $('.sheet__x', sheetEl); x && x.focus({ preventScroll: true });
