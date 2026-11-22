@@ -216,13 +216,14 @@ ul, ol { list-style: none; }
 /* ---------- sheet ---------- */
 .sheet { position: absolute; inset: 0; z-index: 50; }
 .sheet__scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .66); opacity: 0; transition: opacity .3s; }
-.sheet__panel { position: absolute; left: 0; right: 0; bottom: 0; max-height: 88%; overflow-y: auto; background: #161616; border-top: 1px solid var(--line-2); padding: 26px var(--pad) calc(26px + var(--safe-b)); transform: translateY(102%); transition: transform .42s var(--ease); }
-.sheet__grip { position: absolute; top: 0; left: 0; right: 0; height: 44px; z-index: 1; touch-action: none; cursor: grab; }
+.sheet__panel { position: absolute; left: 0; right: 0; bottom: 0; max-height: 88%; overflow-y: auto; overscroll-behavior: contain; background: #161616; border-top: 1px solid var(--line-2); padding: 26px var(--pad) calc(26px + var(--safe-b)); transform: translateY(102%); transition: transform .42s var(--ease); }
+/* the grip sticks to the top edge while the sheet's content scrolls under it */
+.sheet__grip { position: sticky; top: -26px; z-index: 3; display: block; height: 40px; margin: -26px calc(-1 * var(--pad)) -14px; background: linear-gradient(#161616 26px, rgba(22, 22, 22, 0)); touch-action: none; cursor: grab; }
 .sheet__grip::before { content: ''; position: absolute; top: 9px; left: 50%; width: 40px; height: 4px; margin-left: -20px; border-radius: 2px; background: #666; }
 .sheet__grip:active { cursor: grabbing; }
 .sheet.is-on .sheet__scrim { opacity: 1; }
 .sheet.is-on .sheet__panel { transform: none; }
-.sheet__x { position: absolute; top: 14px; right: 12px; margin: 0; z-index: 2; }
+.sheet__x { position: absolute; top: 14px; right: 12px; margin: 0; z-index: 4; }
 .evd__top { display: flex; align-items: center; gap: 14px; padding-right: 44px; }
 .evd__ico { width: 56px; height: 56px; padding: 12px; background: var(--c); color: #000; flex: none; }
 .evd__top .lbl span { color: var(--c); }
