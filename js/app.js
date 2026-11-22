@@ -135,10 +135,39 @@
   let sheetReturn = null;
   function openSheet(html) {
     sheetReturn = document.activeElement;
-    sheetEl.innerHTML = `<div class="sheet__scrim" data-act="close-sheet"></div><div class="sheet__panel" role="dialog" aria-modal="true"><button class="iconbtn sheet__x" data-act="close-sheet" aria-label="Close">${G.close}</button>${html}</div>`;
+    sheetEl.innerHTML = `<div class="sheet__scrim" data-act="close-sheet"></div><div class="sheet__panel" role="dialog" aria-modal="true"><div class="sheet__grip" aria-hidden="true"></div><button class="iconbtn sheet__x" data-act="close-sheet" aria-label="Close">${G.close}</button>${html}</div>`;
     sheetEl.hidden = false;
     requestAnimationFrame(() => sheetEl.classList.add('is-on'));
     const x = $('.sheet__x', sheetEl); x && x.focus({ preventScroll: true });
+    dragToClose($('.sheet__panel', sheetEl), $('.sheet__grip', sheetEl));
+  }
+  // phones: pull the sheet down by its grip to dismiss it; a short pull springs back
+  function dragToClose(panel, grip) {
+    if (!panel || !grip) return;
+    const scrim = $('.sheet__scrim', sheetEl);
+    let y0 = 0, t0 = 0, dy = 0, on = false;
+    grip.addEventListener('pointerdown', e => {
+      on = true; y0 = e.clientY; t0 = performance.now(); dy = 0;
+      grip.setPointerCapture(e.pointerId);
+      panel.style.transition = 'none'; scrim && (scrim.style.transition = 'none');
+    });
+    grip.addEventListener('pointermove', e => {
+      if (!on) return;
+      dy = Math.max(0, e.clientY - y0);
+      panel.style.transform = `translateY(${dy}px)`;
+      scrim && (scrim.style.opacity = String(Math.max(0, 1 - dy / panel.offsetHeight)));
+    });
+    const end = () => {
+      if (!on) return; on = false;
+      const fast = dy / Math.max(1, performance.now() - t0) > 0.5;
+      panel.style.transition = ''; scrim && (scrim.style.transition = '');
+      if (dy > Math.min(120, panel.offsetHeight * 0.25) || (fast && dy > 30)) {
+        panel.style.transform = 'translateY(102%)'; scrim && (scrim.style.opacity = '0');
+        closeSheet();
+      } else { panel.style.transform = ''; scrim && (scrim.style.opacity = ''); }
+    };
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
   }
   function closeSheet(now) {
     if (sheetEl.hidden) return;
@@ -840,10 +869,9 @@
         </div>
 
         ${secHead('Discover CHI')}
-        <div class="progs">${PROGRAMS.map((p, i) => {
-          const n = EVENTS.filter(e => e.type === p.type).length;
+        <div class="progs">${PROGRAMS.map(p => {
           return `<details class="prog-row" name="prog">
-            <summary><span class="lbl">${String(i + 1).padStart(2, '0')}</span><b>${p.name}</b><em class="lbl">${n}</em><i></i></summary>
+            <summary><b>${p.name}</b><i></i></summary>
             <div><p>${p.line}</p><button class="btn btn--ghost btn--sm" data-act="type" data-type="${p.type}">See ${p.name.toLowerCase()} ${G.arrow}</button></div>
           </details>`;
         }).join('')}</div>
