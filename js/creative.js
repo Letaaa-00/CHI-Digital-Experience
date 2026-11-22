@@ -6,6 +6,10 @@
  * are tucked into the gaps the ragged rows leave. The finished cluster is scaled to sit comfortably
  * inside the badge and centred in the middle of it — it never fills the card edge to edge.
  *
+ * Two rules for the graphics: no graphic ever lies on top of another (each keeps GAP of air around it),
+ * and each interest's icon appears once, in one form: filled with an offset outline, cut out of a colour
+ * block, or as a dot matrix. There are no outline-only icons.
+ *
  * Everything is worked out in em (1 em = the base type size), then drawn in pixels.
  * The same seed always gives the same arrangement; "Shuffle" changes the seed.
  */
@@ -20,6 +24,8 @@
   const ASC = 0.928, CAP = 0.711, XH = 0.528; // Roboto Condensed metrics, in em (line-height 1.172)
   const SP = 0.24;        // space between words
   const LEAD = 0.02;      // extra air between rows
+  const GAP = 0.16;       // the least air between two graphics: they never touch, let alone overlap
+  const BAR_DOT = 0.49;   // how far the mix dot hangs below the brand bar
 
   // how each interest is said in the suggested sentence
   const SHORT = {
@@ -28,19 +34,18 @@
   };
 
   // Graphics that sit in a row beside the words. Sizes in em: width range, height, and
-  // b = how far the bottom edge drops below the baseline. Solid ones must not sit behind words.
+  // b = how far the bottom edge drops below the baseline.
   const INLINE = {
-    block:   { w: [2.6, 3.3], h: 1.4,  b: 0.1,  solid: 1 }, // interest colour block with its icon
-    stack:   { w: [2.1, 2.5], h: 1.5,  b: 0.28 },           // three stepped outlines
-    pair:    { w: [1.92, 1.92], h: 0.92, b: 0.02 },         // outlined square + circle
-    glitch:  { w: [2.3, 3.0], h: 1.05, b: 0.3,  solid: 1 }, // striped swatch in the interest colours
-    photo:   { w: [1.6, 2.0], h: 1.36, b: 0.06, solid: 1 }, // an uploaded image
-    ellipse: { w: [1.3, 1.9], h: 0.74, b: 0,    solid: 1 },
-    checker: { w: [1.7, 2.5], h: 0.86, b: 0.04, solid: 1 },
-    wire:    { w: [2.2, 2.9], h: 1.15, b: 0.12 },           // wireframe box
-    bar:     { w: [2.9, 3.6], h: 0.36, b: -0.2, solid: 1 }, // brand gradient, the person's mix as a dot
-    dots:    { w: [1.3, 1.3], h: 1.3,  b: 0.14, solid: 1 }, // an interest icon as a dot matrix
-    scrawl:  { w: [2.4, 3.4], h: 1.0,  b: 0.16 },           // a thin hand-drawn line
+    block:   { w: [2.6, 3.3], h: 1.4,  b: 0.1 },   // interest colour block with its icon
+    stack:   { w: [2.1, 2.5], h: 1.5,  b: 0.28 },  // three stepped outlines
+    pair:    { w: [1.92, 1.92], h: 0.92, b: 0.02 }, // outlined square + circle
+    glitch:  { w: [2.3, 3.0], h: 1.05, b: 0.3 },   // striped swatch in the interest colours
+    photo:   { w: [1.6, 2.0], h: 1.36, b: 0.06 },  // an uploaded image
+    checker: { w: [1.7, 2.5], h: 0.86, b: 0.04 },
+    wire:    { w: [2.2, 2.9], h: 1.15, b: 0.12 },  // wireframe box
+    bar:     { w: [2.9, 3.6], h: 0.36, b: -0.2 },  // brand gradient, the person's mix as a dot (which hangs BAR_DOT below it)
+    dots:    { w: [1.3, 1.3], h: 1.3,  b: 0.14 },  // an interest icon as a dot matrix
+    scrawl:  { w: [2.4, 3.4], h: 1.0,  b: 0.16 },  // a thin hand-drawn line
   };
 
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -127,7 +132,7 @@
   /* ---------- 2. graphics ---------- */
   function inline(type, R, ints, u, extra) {
     const d = INLINE[type];
-    const g = Object.assign({ k: 'g', type, w: between(R, d.w[0], d.w[1]), h: d.h, b: d.b, solid: !!d.solid }, extra);
+    const g = Object.assign({ k: 'g', type, w: between(R, d.w[0], d.w[1]), h: d.h, b: d.b }, extra);
     if (type === 'scrawl') g.d = scribble(R, false);
     if (type === 'dots' || type === 'glitch') g.id = g.id || pick(R, ints).id;
     if (type === 'glitch') g.id2 = ints[(ints.findIndex(x => x.id === g.id) + 1) % ints.length].id;
@@ -165,6 +170,14 @@
       x += it.rw;
     });
     return (row.w = x);
+  }
+  // The flourish under the k-th item of a row, measured from the row's left end and its baseline. It reaches
+  // a little past its word on both sides, but stops short of a graphic standing next to the word.
+  function swooshOf(row, k) {
+    const it = row.items[k], z = row.z, prev = row.items[k - 1], next = row.items[k + 1];
+    const l = prev && prev.k === 'g' ? Math.max(0, Math.min(0.3 * z, gapOf(prev, it, z) - GAP)) : 0.3 * z;
+    const r = next && next.k === 'g' ? Math.max(0, Math.min(0.4 * z, gapOf(it, next, z) - GAP)) : 0.4 * z;
+    return { x: it.rx - l, w: it.rw + l + r, up: 0.1 * z, down: 0.56 * z };
   }
 
   function buildRows(units, Wmax, deck, R) {
@@ -248,7 +261,21 @@
       const gs = r.items.filter(it => it.k === 'g'), ws = r.items.filter(it => it.k === 'w');
       r.asc = Math.max(ws.length ? CAP * r.z + 0.1 : 0, ...gs.map(g => g.h - g.b - 0.14));
       r.desc = Math.max(ws.length ? 0.2 * r.z : 0, ...gs.map(g => (g.type === 'bar' ? 0.3 : g.b)), ws.some(w => w.role === 'num') ? 0.7 : 0, ws.some(w => w.swoosh) ? 0.58 * r.z : 0);
+      // what the row's graphics (and a flourish under one of its words) cover, measured from its baseline
+      r.ink = [];
+      r.items.forEach((it, k) => {
+        if (it.k === 'g') r.ink.push({ x0: r.x + it.rx, x1: r.x + it.rx + it.rw, up: it.h - it.b, down: it.b + (it.type === 'bar' ? BAR_DOT : 0) });
+        else if (it.swoosh) { const s = swooshOf(r, k); r.ink.push({ x0: r.x + s.x, x1: r.x + s.x + s.w, up: s.up, down: s.down }); }
+      });
       y += i ? rows[i - 1].desc + r.asc + LEAD : r.asc;
+      // a tall graphic may reach up into the space under the words above it, but never into another graphic:
+      // where two would meet, this row moves down just far enough to leave GAP between them
+      if (i) {
+        const p = rows[i - 1];
+        let push = 0;
+        r.ink.forEach(a => p.ink.forEach(b => { if (a.x0 < b.x1 + GAP && b.x0 < a.x1 + GAP) push = Math.max(push, p.base + b.down + GAP - (y - a.up)); }));
+        y += push;
+      }
       r.base = y;
     });
     return Wb;
@@ -261,29 +288,45 @@
     boxes.forEach(b => { x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h); });
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
-  function pack(big, boxes, rows, Wlimit, R) { // big.solid === false: an outline, which only has to stay clear of words
+  // the area a piece really covers: the brand bar's dot hangs below it, a tilted photo's corners stick out
+  function ink(o) {
+    if (o.type === 'bar') return { x: o.x, y: o.y, w: o.w, h: o.h + BAR_DOT };
+    if (o.rot) { const s = Math.sin(Math.abs(o.rot) * Math.PI / 180), dx = o.h * s / 2, dy = o.w * s / 2; return { x: o.x - dx, y: o.y - dy, w: o.w + 2 * dx, h: o.h + 2 * dy }; }
+    return o;
+  }
+  // Finds a place for a big piece where it touches nothing: clear of every word and of every other graphic.
+  function pack(big, boxes, rows, Wlimit, R) {
     const ext = bounds(boxes), cands = [];
+    const obst = boxes.map(o => ({ word: o.kind === 'w', r: ink(o) }));
+    const own = ink({ x: 0, y: 0, w: big.w, h: big.h, rot: big.rot }), W = own.w, H = own.h; // the room the piece needs
+    // beside a row, in the gap its ragged end leaves
     rows.forEach(r => {
       const top = r.base - CAP * r.z;
-      [r.x - SP - big.w, r.x + r.w + SP].forEach(x => {
-        [top - 0.16, r.base + 0.12 - big.h, r.base - XH * r.z / 2 - big.h / 2].forEach(y => cands.push({ x, y }));
+      [r.x - SP - W, r.x + r.w + SP].forEach(x => {
+        [top - 0.16, r.base + 0.12 - H, r.base - XH * r.z / 2 - H / 2].forEach(y => cands.push({ x, y }));
       });
+    });
+    // against any one piece: beside it, above it or under it
+    obst.forEach(o => {
+      const q = o.r, g = (o.word ? 0.12 : GAP) + 0.02;
+      [q.x - g - W, q.x + q.w + g].forEach(x => [q.y, q.y + q.h - H, q.y + (q.h - H) / 2].forEach(y => cands.push({ x, y })));
+      [q.y - g - H, q.y + q.h + g].forEach(y => [q.x, q.x + q.w - W].forEach(x => cands.push({ x, y })));
     });
     // on top of the cluster or beneath it: let the piece settle against whatever is in its column
     [0, 0.25, 0.5, 0.75, 1].forEach(t => {
-      const x = ext.x + (ext.w - big.w) * t;
-      const col = boxes.filter(o => (o.kind === 'w' || o.solid) && o.x < x + big.w + 0.1 && x - 0.1 < o.x + o.w);
+      const x = ext.x + (ext.w - W) * t;
+      const col = obst.filter(o => o.r.x < x + W + 0.14 && x - 0.14 < o.r.x + o.r.w);
       if (!col.length) return;
-      cands.push({ x, y: Math.min(...col.map(o => o.y)) - 0.14 - big.h });
-      cands.push({ x, y: Math.max(...col.map(o => o.y + o.h)) + 0.14 });
+      cands.push({ x, y: Math.min(...col.map(o => o.r.y)) - 0.14 - H });
+      cands.push({ x, y: Math.max(...col.map(o => o.r.y + o.r.h)) + 0.14 });
     });
     let best = null;
     cands.forEach(c => {
-      const b = { x: c.x, y: c.y, w: big.w, h: big.h };
-      if (boxes.some(o => (o.kind === 'w' || (o.solid && big.solid !== false)) && hits(b, o, o.kind === 'w' ? 0.12 : 0.05))) return;
+      const b = { x: c.x, y: c.y, w: W, h: H };
+      if (obst.some(o => hits(b, o.r, o.word ? 0.12 : GAP))) return;
       const nw = Math.max(ext.x + ext.w, b.x + b.w) - Math.min(ext.x, b.x), nh = Math.max(ext.y + ext.h, b.y + b.h) - Math.min(ext.y, b.y);
       const cost = nw * nh - ext.w * ext.h + Math.max(0, nw - Wlimit) * 40 + R() * 0.6; // prefer a gap inside the cluster
-      if (!best || cost < best.cost) best = { cost, x: c.x, y: c.y };
+      if (!best || cost < best.cost) best = { cost, x: c.x - own.x, y: c.y - own.y };
     });
     return best;
   }
@@ -295,51 +338,48 @@
     const words = parse(bioText(u, ints), u, ints, R);
     const units = unitsOf(words);
 
-    // every interest and every image is guaranteed a place; the brand bar always appears; the rest is chance
+    // every interest and every image is guaranteed a place; the brand bar always appears; the rest is chance.
+    // Each interest's icon appears once: one of the first two as a big filled icon with an offset outline
+    // (its box holds both), the other cut out of a colour block, any further ones as dot matrices.
     const images = (cr.images || []).filter(okImage).slice(0, MAX_IMAGES);
     const flip = R() < 0.5, deck = [], bigs = [];
     ints.forEach((x, i) => {
-      if (i < 2 && (i === 0) !== flip) { const s = between(R, 2.1, 2.5); bigs.push({ type: 'icon', id: x.id, w: s, h: s, solid: true }); }
+      if (i < 2 && (i === 0) !== flip) { const s = between(R, 2.3, 2.75); bigs.push({ type: 'icon', id: x.id, w: s, h: s }); }
       else deck.push(inline(i < 2 ? 'block' : 'dots', R, ints, u, { id: x.id, must: true }));
     });
     images.forEach((src, i) => {
-      if (i === 0) bigs.push({ type: 'photo', src, w: between(R, 2.1, 2.6), h: between(R, 1.6, 1.95), solid: true, rot: R() < 0.3 ? +((R() - 0.5) * 7).toFixed(1) : 0 });
+      if (i === 0) bigs.push({ type: 'photo', src, w: between(R, 2.1, 2.6), h: between(R, 1.6, 1.95), rot: R() < 0.3 ? +((R() - 0.5) * 7).toFixed(1) : 0 });
       else deck.push(inline('photo', R, ints, u, { src, must: true }));
     });
     deck.push(inline('bar', R, ints, u, { must: true }));
     shuffle(deck, R);
-    shuffle(['stack', 'pair', 'glitch', 'ellipse', 'checker', 'wire', 'scrawl'], R).forEach(t => deck.push(inline(t, R, ints, u)));
+    shuffle(['stack', 'pair', 'glitch', 'checker', 'wire', 'scrawl'], R).forEach(t => deck.push(inline(t, R, ints, u)));
 
     const rows = buildRows(units, Wmax, deck, R);
     // the brand squares ride on "CHI"
-    rows.forEach(r => { const k = r.items.findIndex(it => it.role === 'chi'); if (k >= 0) r.items.splice(k + 1, 0, { k: 'g', type: 'rgb', w: 0.28, h: 0.94, b: 0.02, solid: true }); });
+    rows.forEach(r => { const k = r.items.findIndex(it => it.role === 'chi'); if (k >= 0) r.items.splice(k + 1, 0, { k: 'g', type: 'rgb', w: 0.28, h: 0.94, b: 0.02 }); });
     const Wb = arrange(rows, pick(R, ['right', 'right', 'right', 'left', 'left', 'zig', 'zig', 'mid']), R);
 
     const boxes = [];
-    rows.forEach(r => r.items.forEach(it => {
+    rows.forEach(r => r.items.forEach((it, k) => {
       if (it.k === 'w') {
         const z = it.role === 'num' ? it.z : it.z * r.z, base = r.base + (it.role === 'num' ? 0.44 : 0);
         const b = { kind: 'w', text: it.text, st: it.st, z, base, x: r.x + it.rx, w: it.rw, y: base - CAP * z, h: (CAP + 0.18) * z };
         boxes.push(b);
-        if (it.swoosh) boxes.push({ kind: 'g', type: 'swoosh', d: scribble(R, true), x: b.x - 0.3 * z, y: base - 0.1 * z, w: b.w + 0.7 * z, h: 0.66 * z });
+        if (it.swoosh) { const s = swooshOf(r, k); boxes.push({ kind: 'g', type: 'swoosh', d: scribble(R, true), x: r.x + s.x, y: r.base - s.up, w: s.w, h: s.up + s.down }); }
       } else {
         boxes.push(Object.assign({}, it, { kind: 'g', x: r.x + it.rx, y: r.base + it.b - it.h }));
       }
     }));
 
+    // the big pieces go in last, each where it touches nothing already placed; failing that, under everything
     bigs.forEach(big => {
       const spot = pack(big, boxes, rows, Math.max(Wb, Wmax) * 1.1, R);
-      boxes.push(Object.assign({ kind: 'g' }, big, spot ? { x: spot.x, y: spot.y } : { x: 0, y: bounds(boxes).y + bounds(boxes).h + 0.16 }));
+      const all = bounds(boxes.map(ink));
+      boxes.push(Object.assign({ kind: 'g' }, big, spot ? { x: spot.x, y: spot.y } : { x: all.x, y: all.y + all.h + 0.3 }));
     });
 
-    // sometimes one more interest icon, as a thin outline tucked into a gap
-    if (R() < 0.45) {
-      const x = pick(R, ints), size = between(R, 2.2, 3), ghost = { type: 'ghost', id: x.id, w: size, h: size, solid: false };
-      const spot = pack(ghost, boxes, rows, Math.max(Wb, Wmax) * 1.05, R);
-      if (spot) boxes.unshift(Object.assign({ kind: 'g' }, ghost, { x: spot.x, y: spot.y }));
-    }
-
-    const all = bounds(boxes);
+    const all = bounds(boxes.map(ink)); // measured by what is really covered, so the cluster sits dead centre
     boxes.forEach(b => { b.x -= all.x; b.y -= all.y; if (b.kind === 'w') b.base -= all.y; });
     return { boxes, W: all.w, H: all.h };
   }
@@ -354,7 +394,6 @@
     switch (b.type) {
       case 'block': st.push(`--c:${CAT[b.id].color}`); inner = icon(b.id, b.side === 'left' ? 'l' : ''); break;
       case 'icon': st.push(`--c:${CAT[b.id].color}`); inner = icon(b.id, 'o') + icon(b.id, 'f'); break;
-      case 'ghost': st.push(`--c:${CAT[b.id].color}`); inner = icon(b.id, 'o'); break;
       case 'photo': st.push(`background-image:url(${b.src})`); break;
       case 'stack': case 'rgb': inner = '<i></i><i></i><i></i>'; break;
       case 'pair': inner = '<i></i><i></i>'; break;

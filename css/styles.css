@@ -149,6 +149,16 @@ ul, ol { list-style: none; }
 .mix__legend li { display: flex; align-items: center; gap: 6px; }
 .mix__legend i { width: 9px; height: 9px; }
 .mix__legend b { color: #fff; font: 500 var(--fs-xs) var(--sans); }
+/* a bar with no legend: its shares show in a black box above it while it is hovered, held or focused.
+   The box sits over one colour at a time; --ax is where its pointer goes. */
+.mix--tip { position: relative; padding: 14px 0; margin: -14px 0; touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: default; }
+.mix--tip .mix__bar:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.mix__tip { position: absolute; z-index: 6; left: 0; bottom: calc(100% - 6px); display: grid; gap: 4px; padding: 8px 12px; background: #000; border: 1px solid var(--line-2); font-size: var(--fs-sm); line-height: 1.3; color: #fff; white-space: nowrap; pointer-events: none; animation: flipin .16s var(--ease) both; }
+.mix__tip[hidden] { display: none; }
+.mix__tip::after { content: ''; position: absolute; left: var(--ax, 50%); top: 100%; width: 9px; height: 9px; margin: -4px 0 0 -5px; background: #000; border: solid var(--line-2); border-width: 0 1px 1px 0; transform: rotate(45deg); }
+.mix__tip span { display: flex; align-items: center; gap: 8px; }
+.mix__tip i { width: 9px; height: 9px; flex: none; }
+.mix__tip b { margin-left: 4px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .days { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 0 var(--pad); }
 .day { position: relative; display: grid; justify-items: center; gap: 2px; padding: 10px 0 9px; border: 1px solid var(--line); transition: background .25s, color .25s, border-color .25s; }
@@ -378,6 +388,9 @@ ul, ol { list-style: none; }
 .reveal__ico2 { width: 46px; height: 46px; flex: none; color: var(--c2); }
 @keyframes pxwipe { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
 .is-done .reveal__ico2 { animation: pxwipe .6s steps(6) 1.05s both; }
+/* opened from the dashboard rather than straight after the questions: no reveal, the result is simply there */
+.reveal.is-still .reveal__svg, .reveal.is-still .reveal__stage canvas, .reveal.is-still .reveal__main, .reveal.is-still .reveal__second, .reveal.is-still .reveal__mix, .reveal.is-still .reveal__foot { transition: none; }
+.reveal.is-still .reveal__ico2 { animation: none; }
 .reveal__second h2 { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
 .reveal__mix { padding: 18px var(--pad) 0; }
 .reveal__foot { margin-top: auto; padding: 22px var(--pad) calc(14px + var(--safe-b)); display: grid; gap: 4px; }
@@ -403,21 +416,22 @@ ul, ol { list-style: none; }
 .badge.is-flipped .badge__inner { transform: rotateY(180deg); }
 .badge:active .badge__inner { transition-duration: .2s; transform: scale(.985); }
 .badge.is-flipped:active .badge__inner { transform: rotateY(180deg) scale(.985); }
+/* the small twist that says "this turns over"; app.js plays it soon after the badge appears and every few seconds after */
 @keyframes peek { 0%, 100% { transform: rotateY(0); } 35% { transform: rotateY(-24deg); } 70% { transform: rotateY(9deg); } }
-.badge.peek .badge__inner { animation: peek 1.3s var(--ease) .8s; }
+@keyframes peekback { 0%, 100% { transform: rotateY(180deg); } 35% { transform: rotateY(156deg); } 70% { transform: rotateY(189deg); } }
+.badge.peek .badge__inner { animation: peek 1.3s var(--ease); }
+.badge.is-flipped.peek .badge__inner { animation-name: peekback; }
 .badge__face { position: absolute; inset: 0; background: var(--surface); overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .badge__back { transform: rotateY(180deg); }
 .badge__front { display: flex; flex-direction: column; padding: 6.6cqw; }
 .badge__row { display: flex; gap: 2.6em; color: #fff; font-size: clamp(10px, 2.2cqw, 13px); }
 .badge__row span:last-child { margin-left: auto; }
 /* primary interest dominates; secondary and third step down in a column beside it */
-.badge__icons { display: grid; grid-template-columns: 58cqw 1fr; grid-auto-rows: min-content; align-items: start; gap: 3.2cqw; margin-top: 5.6cqw; }
+/* interest icons: all one size, three to a row, filling from the top left (six at most, so two rows) */
+.badge__icons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4.4cqw; margin-top: 6cqw; }
 .badge__ico { aspect-ratio: 1; color: var(--c); }
-.badge__ico:nth-child(1) { width: 58cqw; grid-row: span 3; }
-.badge__ico:nth-child(2) { width: 25.6cqw; }
-.badge__ico:nth-child(3) { width: 15cqw; }
-.badge__ico:nth-child(n+4) { width: 10cqw; }
-.badge h3 { margin-top: auto; font-size: clamp(30px, 10.2cqw, 62px); font-weight: 500; line-height: 1.12; letter-spacing: -.012em; text-wrap: balance; overflow-wrap: anywhere; }
+.badge__ico .ico { display: block; width: 100%; height: 100%; }
+.badge h3 { margin-top: auto; padding-top: 4cqw; font-size: clamp(30px, 11cqw, 66px); font-weight: 500; line-height: 1.12; letter-spacing: -.012em; text-wrap: balance; overflow-wrap: anywhere; }
 .badge__sub { font-size: clamp(12px, 3cqw, 17px); margin-top: 2.4cqw; color: #fff; overflow-wrap: anywhere; }
 .badge__edit { position: absolute; right: 3.4cqw; bottom: 3.4cqw; z-index: 4; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line-2); background: rgba(30, 30, 30, .92); color: #fff; display: grid; place-items: center; transition: border-color .2s, background .2s, color .2s, transform .3s var(--spring); }
 .badge__edit:hover { border-color: #fff; background: #fff; color: #000; transform: rotate(-10deg); }
@@ -434,11 +448,11 @@ ul, ol { list-style: none; }
 .g-block { background: var(--c); }
 .g-block svg { position: absolute; right: 9%; top: 16%; width: auto; height: 68%; aspect-ratio: 1; fill: #000; }
 .g-block svg.l { right: auto; left: 9%; }
-.g-icon svg, .g-ghost svg { position: absolute; inset: 0; }
-.g-icon svg.f { fill: var(--c); }
-.g-icon svg.o { transform: translate(-10%, 11%); }
-.g-icon svg.o *, .g-ghost svg.o * { fill: none; stroke: var(--c); stroke-width: 1px; vector-effect: non-scaling-stroke; }
-.g-ghost { z-index: 0; }
+/* a big interest icon: filled, with its own outline set off down and to the left; the box holds both */
+.g-icon svg { position: absolute; width: 90.91%; height: 90.91%; }
+.g-icon svg.f { right: 0; top: 0; fill: var(--c); }
+.g-icon svg.o { left: 0; bottom: 0; }
+.g-icon svg.o * { fill: none; stroke: var(--c); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .g-photo { background: #333 center / cover no-repeat; }
 .g-stack i { position: absolute; width: 72%; height: 72%; border: 1px solid #fff; }
 .g-stack i:nth-child(1) { left: 0; top: 28%; } .g-stack i:nth-child(2) { left: 14%; top: 14%; } .g-stack i:nth-child(3) { left: 28%; top: 0; }
@@ -453,9 +467,25 @@ ul, ol { list-style: none; }
 .g-swoosh path { fill: none; stroke: #fff; stroke-width: .13em; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .g-scrawl path, .g-wire path { fill: none; stroke: #fff; stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .g-checker { background: conic-gradient(#fff 25%, #c4c4c4 0 50%, #fff 0 75%, #c4c4c4 0) 0 0 / .36em .36em; }
-.g-ellipse { background: #fff; border-radius: 50%; }
 .g-dots svg { fill: var(--c); }
 .g-glitch { background: repeating-linear-gradient(104deg, var(--c) 0 9%, var(--c2) 9% 15%, #fff 15% 16.5%, var(--c2) 16.5% 22%, #000 22% 24%, var(--c) 24% 31%); }
+
+/* First-visit tour of the dashboard: the page dims except for one lit box, with a card explaining it.
+   The lit box is .tour__hole (its shadow is the dimming); app.js moves it and places the card. */
+.tour { position: absolute; inset: 0; z-index: 90; overflow: hidden; opacity: 0; transition: opacity .3s; touch-action: none; }
+.tour.is-on { opacity: 1; }
+.tour__hole { position: absolute; left: 0; top: 0; box-shadow: 0 0 0 200vmax rgba(0, 0, 0, .8); outline: 1px solid rgba(255, 255, 255, .6); pointer-events: none; }
+.tour__card { position: absolute; left: 12px; top: 0; width: min(340px, calc(100% - 24px)); padding: 16px 18px 14px; background: #000; border: 1px solid var(--line-2); opacity: 0; translate: 0 8px; transition: opacity .2s, translate .35s var(--ease); }
+.tour__card.is-on { opacity: 1; translate: none; }
+.tour__card h3 { margin: 6px 0 8px; font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
+.tour__card > p:not(.lbl) { color: var(--text-2); line-height: 1.45; }
+.tour__row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.tour__row .btn--text { padding: 0 6px 0 0; text-decoration: underline; text-underline-offset: 3px; }
+.tour__row .btn--primary { margin-left: auto; }
+@media (max-width: 759px) { .tour__card { width: calc(100% - 24px); } }
+/* during the tour the pencil on the creative side pulses, so the eye lands on it */
+.badge__edit.is-hint { border-color: #fff; animation: hint 1.4s ease-out infinite; }
+@keyframes hint { from { box-shadow: 0 0 0 0 rgba(255, 255, 255, .7); } to { box-shadow: 0 0 0 16px rgba(255, 255, 255, 0); } }
 
 /* creative badge editor (in the sheet) */
 .cbe { display: grid; gap: 18px; }
@@ -463,7 +493,7 @@ ul, ol { list-style: none; }
 .cbe__preview { position: relative; width: min(52%, 210px); aspect-ratio: .73; margin: 0 auto; background: var(--surface); }
 .cbe__field { display: grid; gap: 8px; }
 .cbe__field .lbl { display: flex; justify-content: space-between; gap: 12px; color: var(--text-2); }
-.cbe__field em { font-style: normal; color: var(--muted); }
+.cbe__field em { flex: none; font-style: normal; color: var(--muted); }
 .cbe__field em.is-full { color: #fff; }
 .cbe__field textarea { display: block; width: 100%; min-height: 92px; resize: none; background: var(--surface); border: 1px solid var(--line-2); border-radius: 0; padding: 12px 14px; font: 400 var(--fs-lg)/1.4 var(--sans); color: #fff; outline: none; transition: border-color .2s; }
 .cbe__field textarea::placeholder { color: #5a5a5a; }
@@ -482,7 +512,7 @@ ul, ol { list-style: none; }
 .dash__ticket { padding: 16px var(--pad) 0; }
 .dash__ticket .btn { width: 100%; }
 .dash__ticket .g { width: 22px; height: 22px; }
-.dash__actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px var(--pad) 0; align-items: center; }
+.dash__actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px var(--pad) 0; align-items: center; justify-content: center; }
 /* the ticket: a big, plain, high-contrast code for door scanners */
 .ticket { display: grid; justify-items: center; text-align: center; padding-top: 8px; }
 .ticket h2 { font-size: var(--fs-2xl); font-weight: 900; letter-spacing: -.025em; line-height: 1.05; margin: 6px 0 20px; }
@@ -697,6 +727,12 @@ ul, ol { list-style: none; }
 .map[data-view="2d"] .seg i { transform: translateX(100%); }
 
 .map__chips { position: absolute; z-index: 25; left: 0; right: 0; bottom: calc(8px + var(--safe-b)); touch-action: pan-x; }
+/* first visit: the controls wait for the arrival animation, then fade in around the plan one after another */
+.map.is-first .map__switch, .map.is-first .map__side, .map.is-first .map__chips { visibility: hidden; opacity: 0; }
+@keyframes mapui { from { opacity: 0; translate: var(--from, 0 10px); } }
+.map.is-ready .map__switch { --from: 0 -10px; animation: mapui .7s var(--ease) .1s both; }
+.map.is-ready .map__side { --from: -10px 0; animation: mapui .7s var(--ease) .25s both; }
+.map.is-ready .map__chips { --from: 0 10px; animation: mapui .7s var(--ease) .4s both; }
 /* levels, top to bottom, on the left; the small dot marks your level */
 .map__side { position: absolute; z-index: 25; top: 122px; left: 16px; display: grid; gap: 8px; }
 .lv { display: grid; background: var(--surface); border: 1px solid var(--line-2); }
@@ -756,6 +792,8 @@ ul, ol { list-style: none; }
 .bar__nav a:hover::after, .bar__nav a.is-cur::after { transform: none; }
 .bar__nav em { font: 500 var(--fs-xs)/18px var(--sans); min-width: 18px; height: 18px; padding: 0 4px; text-align: center; background: var(--g); color: #000; }
 .bar__nav .btn { min-height: 38px; }
+.bar__out { height: 44px; font-size: var(--fs-sm); color: var(--muted); transition: color .2s; }
+.bar__out:hover { color: #fff; }
 
 /* ---------- week schedule (tablet and desktop) ---------- */
 .week { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 0 var(--pad); }

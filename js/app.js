@@ -11,8 +11,9 @@
 
   /* ---------- state ---------- */
   const KEY = 'chi27-proto-v1';
-  const blank = () => ({ mode: null, user: null, schedule: [], checks: {} });
+  const blank = () => ({ mode: null, user: null, schedule: [], checks: {}, seen: {} }); // seen: first-visit guides already shown
   let S = (() => { try { return Object.assign(blank(), JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { return blank(); } })();
+  if (!S.seen || typeof S.seen !== 'object') S.seen = {};
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; /* private mode or storage full — keep in memory */ } };
 
   const newSetup = () => ({ step: 0, name: '', email: '', role: null, mix: [1 / 3, 1 / 3, 1 / 3], topics: [] });
@@ -45,19 +46,58 @@
   const floorOf = roomId => FLOORS[ROOM[roomId].floorIndex];
   const whereLabel = roomId => `${ROOM[roomId].name} · ${floorOf(roomId).name}`;
 
+  // legend: true lists the three shares under the bar; 'tip' keeps them out of sight until the bar is
+  // hovered, held or focused, when the share under the pointer shows in a small black box
   function mixBar(mix, legend, noPct) {
     const s = mix[0] + mix[1] + mix[2] || 1;
     const p = mix.map(v => Math.round(v / s * 100));
-    return `<div class="mix"><div class="mix__bar">${['g', 'r', 'b'].map((k, i) => (mix[i] / s < 0.004 ? '' : `<span style="flex:${mix[i] / s};background:var(--${k})"></span>`)).join('')}</div>${
-      legend ? `<ul class="mix__legend">${PILLARS.map((pl, i) => `<li><i style="background:${pl.color}"></i>${pl.name}${noPct ? '' : `<b>${p[i]}%</b>`}</li>`).join('')}</ul>` : ''}</div>`;
+    const tip = legend === 'tip', said = PILLARS.map((pl, i) => `${pl.name} ${p[i]}%`).join(', ');
+    return `<div class="mix${tip ? ' mix--tip' : ''}"><div class="mix__bar"${tip ? ` tabindex="0" role="img" aria-label="Your mix: ${said}"` : ''}>${['g', 'r', 'b'].map((k, i) => (mix[i] / s < 0.004 ? '' : `<span style="flex:${mix[i] / s};background:var(--${k})" data-n="${PILLARS[i].name}" data-p="${p[i]}"></span>`)).join('')}</div>${
+      legend === true ? `<ul class="mix__legend">${PILLARS.map((pl, i) => `<li><i style="background:${pl.color}"></i>${pl.name}${noPct ? '' : `<b>${p[i]}%</b>`}</li>`).join('')}</ul>` : ''}${
+      tip ? '<div class="mix__tip" hidden></div>' : ''}</div>`;
   }
+  // the black box: over one colour for a pointer (x = where it is), or all three for keyboard focus
+  const MixTip = {
+    host: null, held: false,
+    show(mixEl, x) {
+      const bar = $('.mix__bar', mixEl), tip = $('.mix__tip', mixEl), segs = bar ? $$('span', bar) : [];
+      if (!tip || !segs.length) return;
+      const box = mixEl.getBoundingClientRect();
+      let list = segs, cx = box.left + box.width / 2;
+      if (x != null) {
+        const seg = segs.find(sg => x <= sg.getBoundingClientRect().right + 1) || segs[segs.length - 1], r = seg.getBoundingClientRect();
+        list = [seg]; cx = r.left + r.width / 2;
+      }
+      const key = list.map(sg => sg.dataset.n).join();
+      if (MixTip.host === mixEl && tip.dataset.key === key && !tip.hidden) return;
+      tip.dataset.key = key;
+      tip.innerHTML = list.map(sg => `<span><i style="background:${sg.style.background}"></i>${sg.dataset.n}<b>${sg.dataset.p}%</b></span>`).join('');
+      tip.hidden = false; MixTip.host = mixEl;
+      const w = tip.offsetWidth, left = Math.max(0, Math.min(box.width - w, cx - box.left - w / 2));
+      tip.style.left = left + 'px';
+      tip.style.setProperty('--ax', Math.max(10, Math.min(w - 10, cx - box.left - left)) + 'px');
+    },
+    hide() { if (MixTip.host) { const t = $('.mix__tip', MixTip.host); if (t) t.hidden = true; } MixTip.host = null; MixTip.held = false; },
+  };
+  document.addEventListener('pointerdown', e => {
+    const m = e.target.closest && e.target.closest('.mix--tip');
+    if (m) { MixTip.held = e.pointerType !== 'mouse'; MixTip.show(m, e.clientX); } else MixTip.hide();
+  });
+  document.addEventListener('pointermove', e => {
+    const m = e.target.closest && e.target.closest('.mix--tip');
+    if (m && (e.pointerType === 'mouse' || MixTip.held)) MixTip.show(m, e.clientX);
+    else if (MixTip.host && e.pointerType === 'mouse' && !MixTip.host.matches(':focus-within')) MixTip.hide();
+  });
+  ['pointerup', 'pointercancel'].forEach(t => document.addEventListener(t, e => { if (e.pointerType !== 'mouse') MixTip.hide(); }));
+  document.addEventListener('focusin', e => { const b = e.target.closest && e.target.closest('.mix--tip .mix__bar'); if (b && b.matches(':focus-visible')) MixTip.show(b.parentNode, null); });
+  document.addEventListener('focusout', e => { if (e.target.closest && e.target.closest('.mix--tip')) MixTip.hide(); });
 
   const logo = href => `<a class="logo" href="${href}" aria-label="CHI 2027"><b>CHI</b><span>27</span><i><s></s><s></s><s></s></i></a>`;
   function bar(opts) {
     opts = opts || {};
     const cur = current(), n = S.schedule.length;
     // desktop shows the menu inline; phones and tablets get the hamburger
-    const nav = `<nav class="bar__nav" aria-label="Main">${NAV.map(([r, name]) => `<a href="#/${r}"${cur === r ? ' class="is-cur" aria-current="page"' : ''}>${name}${r === 'dashboard' ? `<em data-sched-count${n ? '' : ' hidden'}>${n}</em>` : ''}</a>`).join('')}${S.user ? '' : `<button class="btn btn--primary btn--sm" data-go="join">Join</button>`}</nav>`;
+    const nav = `<nav class="bar__nav" aria-label="Main">${NAV.map(([r, name]) => `<a href="#/${r}"${cur === r ? ' class="is-cur" aria-current="page"' : ''}>${name}${r === 'dashboard' ? `<em data-sched-count${n ? '' : ' hidden'}>${n}</em>` : ''}</a>`).join('')}${S.user ? `<button class="bar__out" data-act="logout">Log out</button>` : `<button class="btn btn--primary btn--sm" data-go="join">Join</button>`}</nav>`;
     return `<header class="bar ${opts.cls || ''}">
       ${opts.back != null ? `<button class="iconbtn" data-act="back" data-to="${opts.back}" aria-label="Back">${G.back}</button>` : opts.noLogo ? '<span></span>' : logo(opts.onboarding ? '#/' : '#/home')}
       ${opts.right != null ? opts.right : nav + `<button class="burger" data-act="menu" aria-label="Open menu" aria-haspopup="dialog"><i></i><i></i></button>`}
@@ -65,6 +105,8 @@
   }
   const wide = window.matchMedia('(min-width: 760px)');
   const split = window.matchMedia('(min-width: 900px)');
+  const canHover = window.matchMedia('(hover: hover)');
+  const TWIST_EVERY = 6000; // ms between the badge's small twists
   const secHead = (title, extra) => `<div class="sec-h"><h2>${title}</h2>${extra || ''}</div>`;
 
   /* ---------- schedule ---------- */
@@ -236,15 +278,27 @@
     topics.forEach(n => { const t = TOPICS.find(x => x.name === n); if (t) { sc[t.a] += 6; sc[t.b] += 3; } });
     return CATS.map(c => c.id).sort((a, b) => sc[b] - sc[a]);
   }
-  // Everyone starts with those two. A further domain joins the badge once the person has saved
-  // ALSO_EVENTS events from it to their schedule (ALSO_MAX further domains at most).
-  const ALSO_EVENTS = 3, ALSO_MAX = 2;
+  /* The badge's icons, in order (MAX_ICONS at most). u.primary and u.secondary are what the questions gave.
+     - Not presenting: those two.
+     - Presenting: the domain you present in comes first, then the closest domain from your answers;
+       a second domain you present in, if it is not already there, is the third icon.
+     - Either way, a further domain joins once ALSO_EVENTS events from it are in your schedule.
+     Everything that shows a person's interests (badge, creative badge, icon page, suggestions) reads this list. */
+  const ALSO_EVENTS = 2, MAX_ICONS = 6;
   function interestsOf(u) {
+    const list = [];
+    const add = (id, kind) => { if (id && CAT[id] && list.length < MAX_ICONS && !list.some(x => x.id === id)) list.push({ id, kind }); };
+    const pres = [...new Set(myPresentations().map(p => EVENT[p.event].cat))];
+    if (pres.length) {
+      add(pres[0], 'Presenting');
+      add([u.primary, u.secondary].find(id => id !== pres[0]), 'Interest');
+      pres.slice(1).forEach(id => add(id, 'Presenting'));
+    } else { add(u.primary, 'Interest'); add(u.secondary, 'Interest'); }
+    CATS.forEach(c => { if (list.length < 2) add(c.id, 'Interest'); }); // never fewer than two, whatever was stored
     const n = {};
     S.schedule.forEach(id => { const e = EVENT[id]; if (e) n[e.cat] = (n[e.cat] || 0) + 1; });
-    const also = CATS.map(c => c.id).filter(id => id !== u.primary && id !== u.secondary && n[id] >= ALSO_EVENTS)
-      .sort((a, b) => n[b] - n[a]).slice(0, ALSO_MAX);
-    return [{ id: u.primary, kind: 'Primary' }, { id: u.secondary, kind: 'Secondary' }].concat(also.map(id => ({ id, kind: 'Also' })));
+    CATS.map(c => c.id).filter(id => n[id] >= ALSO_EVENTS).sort((a, b) => n[b] - n[a]).forEach(id => add(id, 'Saved'));
+    return list;
   }
   // creative-badge settings, always in a known shape. bio is the person's own sentence; '' means "use the suggested one".
   function creativeOf(u) {
@@ -289,9 +343,9 @@
     Dashboard.paintEditor();
   }
   function recommend(limit) {
-    const u = S.user;
+    const top = S.user ? interestsOf(S.user) : [];
     let pool = EVENTS.filter(e => !inSched(e.id) && !presentingAt(e.id));
-    const w = e => (u ? (e.cat === u.primary ? 5 : e.cat === u.secondary ? 2.5 : 0) : 0) + (e.type === 'keynote' ? 1.5 : 0);
+    const w = e => (top[0] && e.cat === top[0].id ? 5 : top[1] && e.cat === top[1].id ? 2.5 : 0) + (e.type === 'keynote' ? 1.5 : 0);
     return pool.map(e => [w(e), e]).filter(x => x[0] > 0).sort((a, b) => b[0] - a[0] || sortEv(a[1], b[1])).slice(0, limit).map(x => x[1]);
   }
 
@@ -493,28 +547,31 @@
       if (pres) pres.presentations.forEach(p => { if (!inSched(p.event)) S.schedule.push(p.event); });
       save();
       UI.setup = newSetup();
+      UI.revealPlay = true; // fresh answers: the icon page plays its reveal once
       go('icon');
     },
   };
 
-  /* ---------- 4. Icon reveal ---------- */
+  /* ---------- 4. Icon reveal ----------
+     Straight after the questions (first time or a retake) the icon assembles itself. Opened any other way,
+     such as "Show my icon" on the dashboard, the page simply shows the result; tapping the icon replays it. */
   const Reveal = {
     html() {
       const u = S.user;
       if (!u) return `<section class="reveal"><p class="lede">No badge yet.</p><button class="btn btn--primary" data-go="join">Join Conference</button></section>`;
-      const p = CAT[u.primary], s = CAT[u.secondary];
-      return `<section class="reveal" id="reveal" style="--c:${p.color};--c2:${s.color}">
+      const [a, b] = interestsOf(u), p = CAT[a.id], s = CAT[b.id];
+      return `<section class="reveal${UI.revealPlay ? '' : ' is-done is-still'}" id="reveal" style="--c:${p.color};--c2:${s.color}">
         ${bar({ onboarding: true, right: '<button class="btn btn--text btn--sm reveal__retake" data-act="retake"><u>Retake</u></button>', cls: 'bar--clear' })}
         <button class="reveal__stage" data-act="replay" aria-label="Replay the reveal">
           <canvas id="rv" aria-hidden="true"></canvas>
-          <span class="reveal__svg">${icon(u.primary)}</span>
+          <span class="reveal__svg">${icon(a.id)}</span>
         </button>
         <div class="reveal__main">
           <p class="lbl">Primary interest</p>
           <h1>${p.name}</h1>
         </div>
         <div class="reveal__second">
-          <span class="reveal__ico2">${icon(u.secondary)}</span>
+          <span class="reveal__ico2">${icon(b.id)}</span>
           <div><p class="lbl">With a streak of</p><h2>${s.name}</h2></div>
         </div>
         <div class="reveal__mix">${mixBar(u.mix, true, true)}</div>
@@ -528,15 +585,17 @@
       let fx = null;
       const run = () => {
         const root = $('#reveal'); if (!root) return;
-        root.classList.remove('is-done');
+        root.classList.remove('is-done', 'is-still');
         fx && fx.destroy();
         fx = FX.reveal($('#rv'), {
-          id: S.user.primary, mix: S.user.mix,
+          id: interestsOf(S.user)[0].id, mix: S.user.mix,
           onDone() { root.classList.add('is-done'); },
         });
       };
       Reveal.replay = run;
-      run();
+      const play = UI.revealPlay;
+      UI.revealPlay = false;
+      if (play) run();
       return () => fx && fx.destroy();
     },
   };
@@ -651,7 +710,8 @@
     mount() {
       Dashboard.paintSchedule();
       Dashboard.mountProfile();
-      return () => Dashboard.unmountProfile && Dashboard.unmountProfile();
+      const stopTour = S.user && !S.seen.dash ? Tour.queue() : null;
+      return () => { Dashboard.unmountProfile && Dashboard.unmountProfile(); stopTour && stopTour(); };
     },
     // the simple badge (front) and the creative badge (back); a click flips it
     badge() {
@@ -674,9 +734,9 @@
           </div>
         </div>
       </div>
-      <div class="dash__mix">${mixBar(u.mix, true)}</div>
+      <div class="dash__mix">${mixBar(u.mix, 'tip')}</div>
       <div class="dash__ticket"><button class="btn btn--primary" data-act="ticket">${G.qr} Show my ticket</button></div>
-      <div class="dash__actions"><button class="btn btn--ghost btn--sm" data-act="retake">Retake interests</button><button class="btn btn--ghost btn--sm" data-go="icon">Show my icon</button><button class="btn btn--text btn--sm" data-act="logout">Log out</button></div>`;
+      <div class="dash__actions"><button class="btn btn--text btn--sm" data-go="icon">Show my icon</button></div>`;
     },
     // the editor for the creative side, shown in the sheet with a small live preview
     editorHTML() {
@@ -689,7 +749,7 @@
         <label class="cbe__field"><span class="lbl">Bio <em id="cb-count" class="${n >= Creative.BIO_WORDS ? 'is-full' : ''}">${n} / ${Creative.BIO_WORDS} words</em></span>
           <textarea id="cb-bio" rows="3" maxlength="180" autocomplete="off" spellcheck="false" placeholder="${esc(suggested)}">${esc(text)}</textarea></label>
         <button class="link cbe__reset" data-act="cb-reset"${cr.bio ? '' : ' hidden'}>Use the suggested sentence</button>
-        <div class="cbe__field"><span class="lbl">Images <em>${cr.images.length} / ${Creative.MAX_IMAGES} · kept on this device</em></span>
+        <div class="cbe__field"><span class="lbl"><span>Images · Upload relevant works or personal interests</span><em>${cr.images.length} / ${Creative.MAX_IMAGES}</em></span>
           <div class="cbe__imgs">${cr.images.map((src, i) => `<span class="cbe__thumb" style="background-image:url(${src})"><button data-act="cb-rm" data-i="${i}" aria-label="Remove image ${i + 1}">${G.close}</button></span>`).join('')}
             ${full ? '' : `<button class="cbe__add" data-act="cb-add" aria-label="Add images">${G.plus}</button><input type="file" id="cb-file" accept="image/*" multiple hidden>`}</div></div>
         <div class="cbe__row"><button class="btn btn--ghost" data-act="cb-shuffle">Shuffle</button><button class="btn btn--primary" data-act="close-sheet">Done</button></div>
@@ -729,13 +789,24 @@
       ro.observe(b);
       b.addEventListener('click', e => { if (!e.target.closest('.badge__edit')) Dashboard.flip(); });
       b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === b) { e.preventDefault(); Dashboard.flip(); } });
-      // one small nod on first sight, to show the badge has another side
-      if (!UI.peeked && !UI.flipped && !FX.reduced) { UI.peeked = true; b.classList.add('peek'); setTimeout(() => b.classList.remove('peek'), 2300); }
-      Dashboard.unmountProfile = () => { ro.disconnect(); cancelAnimationFrame(raf); };
+      // a small twist soon after the badge appears and again every few seconds, to show it has another side.
+      // It waits while the badge is being handled, has just been flipped, or something is open over the page.
+      b.addEventListener('animationend', e => { if (e.animationName.startsWith('peek')) b.classList.remove('peek'); });
+      const first = setTimeout(() => Dashboard.twist(), 900), again = setInterval(() => Dashboard.twist(), TWIST_EVERY);
+      Dashboard.unmountProfile = () => { ro.disconnect(); cancelAnimationFrame(raf); clearTimeout(first); clearInterval(again); };
+    },
+    twist(force) {
+      const b = $('#badge');
+      if (!b || FX.reduced || document.hidden) return;
+      if (!force && (Tour.on || !sheetEl.hidden || !menuEl.hidden || performance.now() - (UI.flipAt || 0) < 1600
+        || (canHover.matches && b.matches(':hover')) || b.matches(':focus-visible'))) return;
+      b.classList.remove('peek'); void b.offsetWidth; b.classList.add('peek');
     },
     flip(to) {
       const b = $('#badge'); if (!b) return;
+      const was = UI.flipped;
       UI.flipped = to == null ? !UI.flipped : !!to;
+      if (was !== UI.flipped) UI.flipAt = performance.now();
       b.classList.remove('peek');
       b.classList.toggle('is-flipped', UI.flipped);
       b.setAttribute('aria-pressed', UI.flipped);
@@ -821,8 +892,8 @@
     },
     recCard(e) {
       const c = CAT[e.cat];
-      const u = S.user;
-      const why = u && e.cat === u.primary ? 'Primary interest' : u && e.cat === u.secondary ? 'Secondary interest' : e.type === 'keynote' ? 'Everyone’s there' : 'Open to all';
+      const top = S.user ? interestsOf(S.user) : [];
+      const why = top[0] && e.cat === top[0].id ? 'Primary interest' : top[1] && e.cat === top[1].id ? 'Secondary interest' : e.type === 'keynote' ? 'Everyone’s there' : 'Open to all';
       return `<article class="rec" style="--c:${c.color};--on:${onColor(c.color)}" data-act="event" data-id="${e.id}" tabindex="0" role="button">
         <div class="rec__top"><span class="rec__ico">${icon(e.cat)}</span><span class="lbl">${why}</span></div>
         <h3>${esc(e.title)}</h3>
@@ -919,9 +990,9 @@
         ${footer()}
       </section>`;
     },
-    // domain chip order: a domain chosen on the way in, then the person's primary and secondary interest, then the rest
+    // domain chip order: a domain chosen on the way in, then the person's own interests as their badge lists them, then the rest
     chipOrder() {
-      const first = UI.evCats.concat(S.user ? [S.user.primary, S.user.secondary] : []);
+      const first = UI.evCats.concat(S.user ? interestsOf(S.user).map(x => x.id) : []);
       const ids = [...new Set(first.concat(CATS.map(c => c.id)))];
       return ids.map(id => CAT[id]).filter(Boolean);
     },
@@ -978,6 +1049,128 @@
         <button class="btn btn--ghost" data-go="map">${G.pin} Explore the map</button>
         ${footer()}
       </section>`;
+    },
+  };
+
+  /* ---------- first-visit tour of the dashboard ----------
+     A few coach marks: the page dims, one part at a time is lit and explained in a card next to it.
+     While it runs the page underneath can't be used, scrolled or left; Skip (or Escape) ends it.
+     It shows once on this device, the first time someone with a badge opens their dashboard. */
+  const tourEl = document.getElementById('tour');
+  const TOUR_TOP = 84; // where a part is scrolled to: just under the top bar
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const Tour = {
+    on: false, i: 0, list: [], raf: 0, wait: 0, cur: null, last: null, still: 0, placed: false, where: '', ch: 0,
+    steps() {
+      const sec = id => () => { const body = $(id); return body ? [body.previousElementSibling, body] : []; };
+      return [
+        { els: () => [$('#badge')], flip: false, twist: true, title: 'This is your badge',
+          text: `Your interest icons and your name. Save ${['', 'one', 'two', 'three'][ALSO_EVENTS] || ALSO_EVENTS} events from another area and its icon joins, up to ${['', 'one', 'two', 'three', 'four', 'five', 'six'][MAX_ICONS] || MAX_ICONS}. Tap the badge to turn it over.` },
+        { els: () => [$('#badge')], flip: true, hint: true, title: 'The other side is yours',
+          text: 'Your creative badge. Tap the pencil to rewrite your sentence and add images: your work, or anything that says who you are.' },
+        $('#dash-pres') && { els: sec('#dash-pres'), title: 'My Presentations',
+          text: myPresentations().length ? 'Your slots, rooms and what to prepare for each.' : 'Presenting a paper, poster or demo? Link your registration email and your slots show up here.' },
+        { els: sec('#dash-sched'), title: 'My Schedule', text: 'Every event you save lands here, day by day.' },
+        { els: sec('#dash-recs'), title: 'Events that might interest you', text: 'Picked to match your interests. Tap + to save one.' },
+      ].filter(Boolean);
+    },
+    // called when the dashboard opens; starts once the page has settled
+    queue() {
+      clearTimeout(Tour.wait);
+      Tour.wait = setTimeout(() => { if (current() === 'dashboard' && S.user && !S.seen.dash && sheetEl.hidden && menuEl.hidden) Tour.start(); }, FX.reduced ? 200 : 700);
+      return () => clearTimeout(Tour.wait);
+    },
+    start() {
+      if (Tour.on || !tourEl) return;
+      Tour.on = true; Tour.list = Tour.steps(); Tour.cur = null;
+      app.inert = true;
+      toastEl.classList.remove('is-on');
+      tourEl.innerHTML = '<div class="tour__hole"></div><div class="tour__card" role="dialog" aria-modal="true" aria-labelledby="tour-t" aria-describedby="tour-d"></div>';
+      tourEl.hidden = false;
+      requestAnimationFrame(() => tourEl.classList.add('is-on'));
+      Tour.show(0);
+      Tour.raf = requestAnimationFrame(Tour.tick);
+    },
+    show(i) {
+      const st = Tour.list[i];
+      if (!st) { Tour.end(); return; }
+      Tour.i = i; Tour.placed = false; Tour.still = performance.now(); Tour.last = null;
+      $('.tour__card', tourEl).classList.remove('is-on');
+      if (st.flip != null) Dashboard.flip(st.flip);
+      const ed = $('.badge__edit'); ed && ed.classList.toggle('is-hint', !!st.hint);
+      // bring the part under the top bar, unless all of it is already comfortably in view
+      const f = tourEl.getBoundingClientRect(), r = Tour.rect(st, f);
+      if (r && !(r.y >= TOUR_TOP - 12 && r.y + r.h <= f.height * 0.62)) app.scrollTo({ top: Math.max(0, app.scrollTop + r.y - TOUR_TOP), behavior: FX.reduced ? 'auto' : 'smooth' });
+    },
+    // the part's box inside the frame, with a little air around it
+    rect(st, f) {
+      const els = st.els().filter(Boolean);
+      if (!els.length) return null;
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      els.forEach(el => { const b = el.getBoundingClientRect(); x0 = Math.min(x0, b.left); y0 = Math.min(y0, b.top); x1 = Math.max(x1, b.right); y1 = Math.max(y1, b.bottom); });
+      return { x: x0 - f.left - 8, y: y0 - f.top - 8, w: x1 - x0 + 16, h: y1 - y0 + 16 };
+    },
+    // what is lit: the part's box, kept inside the frame and clear of the card
+    clip(r, f) {
+      const top = TOUR_TOP - 12, bot = f.height - 14, s = Tour.placed ? Tour.where : '';
+      let y0 = Math.max(top, r.y), y1 = Math.min(bot, r.y + r.h);
+      if (s === 'dock' || s === 'below') y1 = Math.min(y1, bot - Tour.ch - 14);
+      if (s === 'dock-top' || s === 'above') y0 = Math.max(y0, top + Tour.ch + 14);
+      const x0 = Math.max(6, r.x), x1 = Math.min(f.width - 6, r.x + r.w);
+      return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+    },
+    // write the card for this step and put it where it doesn't cover the part: along the bottom (or top) edge
+    // on phones; beside, below or above the part on wider screens
+    place(st, r, f) {
+      const card = $('.tour__card', tourEl), n = Tour.list.length, last = Tour.i === n - 1;
+      card.innerHTML = `<p class="lbl">${Tour.i + 1} / ${n}</p><h3 id="tour-t">${st.title}</h3><p id="tour-d">${st.text}</p>
+        <div class="tour__row">${last ? '' : '<button class="btn btn--text btn--sm" data-act="tour-skip">Skip</button>'}<button class="btn btn--primary btn--sm" data-act="tour-next">${last ? 'Done' : 'Next ' + G.arrow}</button></div>`;
+      const cw = card.offsetWidth, ch = card.offsetHeight, top = TOUR_TOP - 12, bot = f.height - 14;
+      const where = f.width < 760 ? (r.y >= top + ch + 20 ? 'dock-top' : 'dock')
+        : r.x + r.w + 16 + cw <= f.width - 12 ? 'right'
+        : bot - ch - 14 - Math.max(r.y, top) >= Math.min(r.h, 160) ? 'below' : 'above';
+      Tour.where = where; Tour.ch = ch; Tour.placed = true;
+      const t = Tour.clip(r, f), side = Math.max(12, Math.min(f.width - cw - 12, t.x));
+      const [x, y] = where === 'dock' ? [12, bot - ch] : where === 'dock-top' ? [12, top]
+        : where === 'right' ? [t.x + t.w + 16, Math.max(top, Math.min(bot - ch, t.y))]
+        : where === 'below' ? [side, t.y + t.h + 14] : [side, Math.max(top, t.y - 14 - ch)];
+      card.style.left = x + 'px'; card.style.top = y + 'px';
+      card.classList.add('is-on');
+      const next = $('[data-act="tour-next"]', card); next && next.focus({ preventScroll: true });
+      if (st.twist) Dashboard.twist(true);
+    },
+    // every frame: the lit box follows the part (through scrolling, resizing and the badge turning over),
+    // and the card is set down once the part has come to rest
+    tick() {
+      if (!Tour.on) return;
+      const st = Tour.list[Tour.i], f = tourEl.getBoundingClientRect(), hole = $('.tour__hole', tourEl), r = Tour.rect(st, f);
+      if (r && hole) {
+        const l = Tour.last, now = performance.now();
+        const moved = !l || Math.abs(r.x - l.x) + Math.abs(r.y - l.y) + Math.abs(r.w - l.w) + Math.abs(r.h - l.h) + Math.abs(f.width - l.fw) + Math.abs(f.height - l.fh) >= 0.5;
+        if (moved) Tour.still = now; // when it last moved
+        Tour.last = { x: r.x, y: r.y, w: r.w, h: r.h, fw: f.width, fh: f.height, at: now };
+        if (moved && Tour.placed) { Tour.placed = false; $('.tour__card', tourEl).classList.remove('is-on'); }
+        if (!Tour.placed && now - Tour.still >= 110) Tour.place(st, r, f);
+        const t = Tour.clip(r, f), c = Tour.cur || { x: 0, y: 0, w: f.width, h: f.height };
+        const k = FX.reduced ? 1 : 1 - Math.exp(-(l ? Math.min(64, now - l.at) : 16) / 70); // same glide at any frame rate
+        const near = (a, b) => (Math.abs(a - b) < 0.4 ? b : lerp(a, b, k));
+        Tour.cur = { x: near(c.x, t.x), y: near(c.y, t.y), w: near(c.w, t.w), h: near(c.h, t.h) };
+        hole.style.transform = `translate(${Tour.cur.x.toFixed(1)}px,${Tour.cur.y.toFixed(1)}px)`;
+        hole.style.width = Tour.cur.w.toFixed(1) + 'px'; hole.style.height = Tour.cur.h.toFixed(1) + 'px';
+      }
+      Tour.raf = requestAnimationFrame(Tour.tick);
+    },
+    end() {
+      if (!Tour.on) return;
+      Tour.on = false; cancelAnimationFrame(Tour.raf);
+      S.seen.dash = true; save();
+      app.inert = false;
+      const ed = $('.badge__edit'); ed && ed.classList.remove('is-hint');
+      Dashboard.flip(false);
+      tourEl.classList.remove('is-on');
+      setTimeout(() => { if (!Tour.on) { tourEl.hidden = true; tourEl.innerHTML = ''; } }, 320);
+      app.scrollTo({ top: 0, behavior: FX.reduced ? 'auto' : 'smooth' });
+      const b = $('#badge'); b && b.focus({ preventScroll: true });
     },
   };
 
@@ -1068,6 +1261,8 @@
   const current = () => parts()[0] || '';
 
   function render() {
+    // the dashboard tour holds the page until it is finished or skipped
+    if (Tour.on) { if (current() !== 'dashboard') history.replaceState(null, '', '#/dashboard'); return; }
     const p = parts(), name = p[0] || '';
     const screen = SCREENS[name] || Landing;
     if (leave) { try { leave(); } catch (e) { /* ignore */ } leave = null; }
@@ -1133,7 +1328,9 @@
       if (!S.mode || S.mode === 'guest') S.mode = 'attendee';
       go('setup');
     },
-    logout() { S.user = null; S.mode = null; save(); go(''); toast('Logged out'); },
+    logout() { S.user = null; S.mode = null; S.seen = {}; save(); go(''); toast('Logged out'); }, // the next person here gets the first-visit guides again
+    'tour-next'() { Tour.show(Tour.i + 1); },
+    'tour-skip'() { Tour.end(); },
     reset() { S = blank(); save(); UI.setup = newSetup(); UI.evCats = []; UI.evType = null; UI.evDay = UI.dashDay = 0; go(''); toast('Prototype reset'); },
     'cb-edit'() { Dashboard.openEditor(); },
     'cb-add'() { const f = $('#cb-file'); f && f.click(); },
@@ -1204,7 +1401,7 @@
     }
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { if (!sheetEl.hidden) closeSheet(); else if (!menuEl.hidden) closeMenu(); return; }
+    if (e.key === 'Escape') { if (Tour.on) Tour.end(); else if (!sheetEl.hidden) closeSheet(); else if (!menuEl.hidden) closeMenu(); return; }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role="button"][data-act]')) { e.preventDefault(); e.target.click(); }
   });
   document.addEventListener('input', e => {
@@ -1253,7 +1450,8 @@
     if (e.key === 'Enter' && e.target.matches && e.target.matches('.setup input')) { e.preventDefault(); const n = $('#next'); if (n && !n.disabled) n.click(); }
   });
 
-  window.APP = { screens: SCREENS, actions: {}, icon, esc, toast, openSheet, closeSheet, eventSheet, addBtn, evCard, go, bar, G, state: () => S, dayLabel, floorOf, presentingAt };
+  window.APP = { screens: SCREENS, actions: {}, icon, esc, toast, openSheet, closeSheet, eventSheet, addBtn, evCard, go, bar, G, state: () => S, dayLabel, floorOf, presentingAt,
+    seen: k => !!S.seen[k], markSeen: k => { S.seen[k] = true; save(); } };
 
   wide.addEventListener('change', () => { if (current() === 'dashboard') Dashboard.paintSchedule(); });
   window.addEventListener('hashchange', render);

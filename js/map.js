@@ -1,6 +1,7 @@
 /* Map: the levels of the David L. Lawrence Convention Center as a floor plan.
-   On arrival a short animation shows every level as an exploded 3D stack, picks out Level 2 (where you are)
-   and settles into its 2D plan. A 3D / 2D switch flips between the plan and a 3D view focused on that level.
+   The first time the map is opened a short animation shows every level as an exploded 3D stack, picks out
+   Level 2 (where you are) and settles into its 2D plan, and the controls fade in around it. Once that has
+   played, the map opens straight on the 2D plan. A 3D / 2D switch flips between the plan and a 3D view focused on that level.
    Rooms are coloured by the domain of what's on in them now (or next). People on your level show as one icon per group when
    zoomed out; zooming in spreads each group into coloured dots, following the zoom continuously. Tap a group
    to zoom into it, tap a dot to see who it is, or tap anywhere else in a room to see what's on there now and how
@@ -188,7 +189,8 @@
       st.room = null; st.floor = MINE; st.filter = null; st.view = '2d';
       if (arg && arg[0] === 'room' && ROOM[arg[1]]) { st.room = arg[1]; st.floor = ROOM[arg[1]].floorIndex; }
       const cats = CATS.filter(c => GROUPS.some(g => g.cat === c.id));
-      return `<section class="map" id="map" data-view="2d" aria-label="Venue map">
+      // on a first visit the controls stay out of sight until the arrival animation has settled into the plan
+      return `<section class="map${A.seen('map') ? '' : ' is-first'}" id="map" data-view="2d" aria-label="Venue map">
         ${A.bar({ cls: 'bar--float' })}
         <div class="fp" id="fp">
           <svg class="fp__svg" id="fpsvg" aria-hidden="true"></svg>
@@ -224,7 +226,7 @@
   function mountPlan() {
     const box = $('#fp'), svg = $('#fpsvg');
     const dots = $$('#fppl .pd'), groups = $$('#fppl .pg'), you = $('#fppl .pp--you');
-    const r = R = { vw: 1, vh: 1, frame: 0, tween: 0, intro: true };
+    const r = R = { vw: 1, vh: 1, frame: 0, tween: 0, intro: !A.seen('map') }; // the arrival plays until it has been seen once
 
     function measure() {
       const b = box.getBoundingClientRect();
@@ -415,13 +417,20 @@
         if (!r.intro) return;
         tweenTo(preset('pick', st.floor), 600, () => setTimeout(() => {
           if (!r.intro) return;
-          tweenTo(preset('2d', st.floor), 1300, () => { r.intro = false; box.classList.remove('is-intro'); });
+          tweenTo(preset('2d', st.floor), 1300, settled);
         }, 250));
       }, 250), ease);
     }
+    // the arrival is over (played through, or skipped with a tap). On a first visit this is when the
+    // controls fade in around the plan: the 3D / 2D switch, the level list and the filter chips.
+    function settled() {
+      r.intro = false; box.classList.remove('is-intro');
+      const m = $('#map');
+      if (m && m.classList.contains('is-first')) { m.classList.replace('is-first', 'is-ready'); A.markSeen('map'); }
+    }
     function endIntro() {
       if (!r.intro) return;
-      r.intro = false; box.classList.remove('is-intro');
+      settled();
       cancelAnimationFrame(r.tween);
       P = preset('2d', st.floor); draw();
     }
@@ -479,12 +488,13 @@
     box.addEventListener('click', swallow, true);
     window.addEventListener('resize', measure);
 
-    box.classList.add('is-intro');
+    box.classList.toggle('is-intro', r.intro);
     setView('2d');
     paintLevels();
+    if (!r.intro) P = preset('2d', st.floor); // seen before: no arrival, straight to the plan
     measure();
     applyFilter();
-    intro();
+    if (r.intro) intro();
 
     return () => {
       cancelAnimationFrame(r.frame); cancelAnimationFrame(r.tween); r.intro = false;

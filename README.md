@@ -17,10 +17,10 @@ then visit http://localhost:4127.
 - **Start page** — animated pixel mosaic of the domain icons, dates and venue, Join / Log in.
 - **Join** — Attendee, Visitor or Guest mode.
 - **Interest questions** — badge (name, email), role, a three-way interest mix, topic picks.
-- **Icon reveal** — primary and secondary interest icons.
-- **Account dashboard** — a simple badge (interest icons and name), My Presentations, My Schedule, suggested events. Everyone starts with their two closest interests; a further one joins the badge after three events from that domain are saved.
-- **Creative badge** — the back of the badge (click to flip): the person's bio sentence (editable, 20 words) set as a tight collage with their interest icons, uploaded images and random graphics, name largest, centred on the card. The edit button at its bottom right opens the editor.
-- **Home, Events, About** and a **Map** with a 2D crowd view and a 3D floor breakout.
+- **Icon reveal** — primary and secondary interest icons. The reveal animation plays straight after the questions (first time or a retake); opened from the dashboard's "Show my icon", the page shows the result directly.
+- **Account dashboard** — a simple badge (interest icons and name), My Presentations, My Schedule, suggested events. Everyone starts with their two closest interests. A presenter's first icon is the domain they present in, the second is the closest domain from their answers, and a second domain they present in becomes the third icon. A further domain joins the badge once two events from it are saved (six icons at most, three to a row). The badge twists a little every few seconds to show it turns over. The mix bar under it shows each share in a small box on hover, hold or focus. A short tour runs the first time the dashboard opens; it holds the page until it is finished or skipped.
+- **Creative badge** — the back of the badge (click to flip): the person's bio sentence (editable, 20 words) set as a tight collage with their interest icons, uploaded images and random graphics, name largest, centred on the card. No graphic lies on top of another, each interest's icon appears once, and there are no outline-only icons. The edit button at its bottom right opens the editor.
+- **Home, Events, About** and a **Map** with a 2D crowd view and a 3D floor breakout. The 3D-to-2D arrival animation plays on the first visit only; after that the map opens straight on the 2D plan.
 
 Sample presenter emails (fill My Presentations automatically): `alex.rivera@example.org`, `sam.okonkwo@example.org`. Any password works.
 
